@@ -1,6 +1,6 @@
 # Azure AI Foundry Workshop
 
-This repository contains code and resources for a comprehensive Azure AI Foundry workshop focusing on building intelligent document processing and search solutions using Azure AI services.
+This repository contains code and resources for a comprehensive Azure AI Foundry workshop focusing on building intelligent document processing, search solutions using Azure AI services and Azure AI Foundry.
 
 ## Workshop Goals
 
@@ -13,17 +13,20 @@ This repository contains code and resources for a comprehensive Azure AI Foundry
 ## Workshop Agenda
 
 ### 1. Introduction to LLMs (45 minutes)
+
 - LLMs Introduction
 - Prompt Engineering techniques
 - Retrieval-Augmented Generation (RAG)
 
 ### 2. Azure AI Services Overview (2.5 hours)
+
 - **Document Intelligence Service**
 - **AI Search Service**
 - **Azure OpenAI Models overview**
 - **Demo**: OpenAI Service + hands-on (in portal and studio)
 
 ### 3. Azure AI Foundry (3 hours)
+
 - Model Catalog
 - AI Agents
 - Agent Service
@@ -34,10 +37,12 @@ This repository contains code and resources for a comprehensive Azure AI Foundry
 - **Demo + Hands-on**: Agent Service (create agent A, B, communicate between them + MCP)
 
 ### 4. Azure Responsible AI and Security (30 minutes)
+
 - Content Filters
 - Prompt Protection
 
 ### 5. Optional: Common Architectural Patterns for AI-Based Applications (45 minutes)
+
 - Agentic Applications Architecture
 - Best Practices and Design Patterns
 
@@ -61,16 +66,19 @@ aifoundry-workshop/
 ## Key Features
 
 ### Azure AI Search Integration
+
 - **Vector Search**: Semantic search using embeddings
 - **Hybrid Search**: Combines keyword and vector search
 - **Document Indexing**: Automatic processing and indexing of Markdown documents
 
 ### Azure AI Foundry Integration
+
 - **Text Embeddings**: Using Azure OpenAI text-embedding-3-small model
 - **Document Processing**: Smart page splitting and content extraction
 - **Search Capabilities**: Semantic and hybrid search functionality
 
 ### Document Intelligence
+
 - **PDF Processing**: Convert PDF documents to Markdown format
 - **Content Extraction**: Extract and structure document content
 - **Page Segmentation**: Intelligent document page splitting
@@ -78,6 +86,7 @@ aifoundry-workshop/
 ## Getting Started
 
 ### Prerequisites
+
 - Python 3.12+
 - Azure subscription with access to:
   - Azure OpenAI Service
@@ -88,33 +97,34 @@ aifoundry-workshop/
 ### Quick Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/vladfeigin/aifoundry-workshop.git
    cd aifoundry-workshop
    ```
-
 2. **Install dependencies**
+
    ```bash
    # Using UV (recommended)
    uv sync
-   
+
    # Or using pip
    pip install -e .
    ```
-
 3. **Configure environment**
+
    ```bash
    cp aisearch/.env.template aisearch/.env
    # Edit .env with your Azure credentials
    ```
-
 4. **Run the search index creation**
+
    ```bash
    cd aisearch
    python create_search_index.py
    ```
-
 5. **Process documents**
+
    ```bash
    python document_processor.py
    ```
@@ -139,6 +149,7 @@ AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 ## Usage Examples
 
 ### Creating a Search Index
+
 ```python
 from aisearch.create_search_index import create_search_index
 
@@ -147,6 +158,7 @@ create_search_index()
 ```
 
 ### Processing Documents
+
 ```python
 from aisearch.document_processor import DocumentProcessor
 
@@ -155,6 +167,7 @@ processor.process_documents()
 ```
 
 ### Searching Documents
+
 ```python
 # Semantic search
 results = processor.search_documents("your search query")
@@ -166,6 +179,7 @@ results = processor.hybrid_search("your search query")
 ## Contributing
 
 This workshop is designed for learning purposes. Feel free to:
+
 - Experiment with different models and configurations
 - Add new document processing capabilities
 - Enhance search functionality

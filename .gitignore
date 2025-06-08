@@ -11,3 +11,4 @@ wheels/
 aisearch/.env
 docintel/.env
 docintel/data/azure-ai-foundry.pdf
+.env

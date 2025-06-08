@@ -32,6 +32,219 @@ The RAG agent implements the following workflow:
 - **Authentication**: Supports both API key (development) and managed identity (production)
 - **Observability**: Built-in performance metrics and timing
 
+### 📊 **Azure AI Foundry Tracing & Observability**
+
+- **Auto-Instrumentation**: Automatic tracing of OpenAI API calls and HTTP requests
+- **Custom Spans**: Business logic tracing for RAG operations (retrieval, generation, etc.)
+- **Performance Metrics**: Detailed timing and token usage tracking
+- **Error Tracking**: Exception capture and error analysis
+- **Azure Monitor Integration**: Seamless integration with Application Insights
+
+## Tracing Implementation
+
+### Overview
+
+The RAG agent implements comprehensive tracing using **Azure Monitor OpenTelemetry** and **auto-instrumentation** to provide deep observability into the RAG pipeline. This enables monitoring, debugging, and optimization of the system in production.
+
+### Tracing Architecture
+
+The implementation uses a **hybrid tracing approach**:
+
+1. **Auto-Instrumentation**: Automatically captures detailed traces for:
+   - All OpenAI API calls (embeddings, chat completions)
+   - HTTP requests to Azure services
+   - Request/response details, token usage, and timing
+
+2. **Custom Business Logic Spans**: Manual spans for RAG-specific operations:
+   - Document retrieval workflow
+   - Context preparation and formatting
+   - Response generation pipeline
+   - Error handling and retry logic
+
+### What Gets Traced
+
+#### 🤖 **OpenAI Operations (Auto-Instrumented)**
+- **Embedding Generation**: Model name, input length, output dimensions, token usage
+- **Chat Completions**: Model name, prompt length, response length, temperature, max tokens
+- **API Performance**: Request/response times, rate limiting, errors
+
+#### 🔍 **Search Operations (Custom Spans)**
+- **Document Retrieval**: Query text, search type (hybrid/keyword), number of results
+- **Vector Search**: Embedding dimensions, similarity scores, retrieval time
+- **Context Processing**: Document count, content length, truncation details
+
+#### 📊 **Business Metrics (Custom Spans)**
+- **End-to-End Pipeline**: Total RAG execution time
+- **Component Performance**: Retrieval vs generation timing breakdown
+- **Quality Metrics**: Search scores, document relevance, response confidence
+
+#### 🚨 **Error Handling & Retries**
+- **Exception Tracking**: Full stack traces with context
+- **Retry Logic**: Attempt counts, backoff timing, success/failure rates
+- **Degraded Performance**: Slow requests, timeouts, rate limits
+
+### Tracing Configuration
+
+#### Environment Setup
+
+The tracing is automatically configured when you set up your Azure AI Foundry project:
+
+```bash
+# Required for Azure AI Foundry integration
+AZURE_SUBSCRIPTION_ID=your-subscription-id
+AZURE_RESOURCE_GROUP=your-resource-group
+AZURE_PROJECT_NAME=your-project-name
+AZURE_PROJECT_ENDPOINT=https://your-project.region.api.azureml.ms
+```
+
+#### Code Integration
+
+The RAG agent automatically sets up tracing in the constructor:
+
+```python
+# Auto-instrumentation setup (in RAGAgent.__init__)
+configure_azure_monitor(connection_string=connection_string)
+
+# Enable auto-instrumentation for OpenAI and HTTP requests
+OpenAIInstrumentor().instrument()
+RequestsInstrumentor().instrument()
+```
+
+### Viewing Traces in Azure AI Foundry
+
+#### 1. **Access the Tracing Portal**
+- Navigate to your Azure AI Foundry project
+- Go to **"Tracing"** in the left navigation
+- View real-time traces and historical data
+
+#### 2. **Trace Hierarchy**
+```
+🔄 rag_agent.ask (root span)
+├── 🔍 rag_agent.retrieve_documents
+│   ├── 🤖 rag_agent.generate_embedding
+│   │   └── 🌐 openai.embeddings.create (auto-instrumented)
+│   └── 🔍 azure_search.hybrid_search
+└── 🤖 rag_agent.generate_response
+    └── 🌐 openai.chat.completions.create (auto-instrumented)
+```
+
+#### 3. **Key Metrics Available**
+- **Performance**: Response times, token usage, throughput
+- **Quality**: Search relevance scores, context utilization
+- **Reliability**: Error rates, retry counts, success rates
+- **Cost**: Token consumption, API call frequency
+
+### Custom Span Examples
+
+#### Document Retrieval Span
+```python
+with tracer.start_as_current_span("rag_agent.retrieve_documents") as span:
+    span.set_attribute("search.query", query)
+    span.set_attribute("search.use_hybrid", use_hybrid)
+    span.set_attribute("search.top_k", self.top_k_documents)
+    span.set_attribute("search.documents_retrieved", len(retrieved_docs))
+    span.set_attribute("search.retrieval_time", retrieval_time)
+```
+
+#### Response Generation Span
+```python
+with tracer.start_as_current_span("rag_agent.generate_response") as span:
+    span.set_attribute("generation.model", self.chat_model)
+    span.set_attribute("generation.max_tokens", max_tokens)
+    span.set_attribute("generation.temperature", temperature)
+    span.set_attribute("generation.query_length", len(query))
+    span.set_attribute("generation.context_length", len(context))
+```
+
+### Auto-Instrumentation Benefits
+
+#### 🚀 **Zero-Code OpenAI Tracing**
+- Automatically captures all OpenAI SDK calls
+- No manual span creation required for API calls
+- Includes request/response payloads and metadata
+
+#### 📊 **Comprehensive Metrics**
+```json
+{
+  "operation_name": "openai.chat.completions.create",
+  "model": "gpt-4.1", 
+  "prompt_tokens": 1250,
+  "completion_tokens": 450,
+  "total_tokens": 1700,
+  "response_time": "2.3s",
+  "temperature": 0.1,
+  "max_tokens": 1000
+}
+```
+
+#### 🔍 **HTTP Request Tracing**
+- All HTTP requests to Azure services automatically traced
+- Network timing, response codes, payload sizes
+- Retry attempts and error conditions
+
+### Monitoring & Alerting
+
+#### Performance Monitoring
+- Set up alerts for slow RAG responses (>5 seconds)
+- Monitor token usage trends and costs
+- Track search relevance score distributions
+
+#### Error Monitoring  
+- Alert on OpenAI API errors or rate limits
+- Monitor search service availability
+- Track retry rates and failure patterns
+
+#### Quality Monitoring
+- Monitor average search scores
+- Track response generation success rates
+- Analyze context utilization patterns
+
+### Debugging with Traces
+
+#### Common Debugging Scenarios
+
+1. **Slow RAG Responses**
+   - Check span timing breakdown (retrieval vs generation)
+   - Analyze search performance and document count
+   - Review OpenAI response times and token usage
+
+2. **Poor Search Results**
+   - Examine search query attributes and scores
+   - Review embedding generation performance
+   - Analyze hybrid vs keyword search effectiveness
+
+3. **OpenAI API Issues**
+   - Review auto-instrumented OpenAI spans for errors
+   - Check rate limiting and retry patterns
+   - Analyze prompt engineering effectiveness
+
+#### Trace Analysis Tips
+- Use the span hierarchy to understand request flow
+- Compare successful vs failed request patterns
+- Monitor attribute trends over time for optimization
+
+### Best Practices
+
+#### 1. **Attribute Naming**
+- Use consistent naming conventions (e.g., `search.`, `generation.`, `embedding.`)
+- Include relevant business context in span names
+- Add meaningful attributes for filtering and analysis
+
+#### 2. **Error Handling**
+- Always record exceptions in spans: `span.record_exception(e)`
+- Set appropriate span status: `span.set_status(trace.Status(...))`
+- Include error context in attributes
+
+#### 3. **Performance Optimization**
+- Use spans to identify bottlenecks in the RAG pipeline
+- Monitor token usage to optimize costs
+- Track context window utilization for efficiency
+
+#### 4. **Security Considerations**
+- Avoid logging sensitive data in span attributes
+- Use span events for detailed debugging without exposing data
+- Configure sampling rates for high-volume scenarios
+
 ## Architecture
 
 ### System Design

@@ -21,6 +21,11 @@ from dataclasses import dataclass
 from azure.search.documents import SearchClient
 from azure.core.credentials import AzureKeyCredential
 from azure.identity import DefaultAzureCredential
+from azure.ai.projects import AIProjectClient
+from azure.monitor.opentelemetry import configure_azure_monitor
+from opentelemetry import trace
+from opentelemetry.instrumentation.openai import OpenAIInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from openai import AzureOpenAI
 from dotenv import load_dotenv
 
@@ -33,6 +38,10 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Get tracer for OpenTelemetry spans
+tracer = trace.get_tracer(__name__)
+
 
 
 @dataclass
@@ -103,6 +112,34 @@ class RAGAgent:
         self.max_context_length = max_context_length
         self.top_k_documents = top_k_documents
 
+        #for more details see:
+        #https://learn.microsoft.com/en-us/python/api/overview/azure/ai-projects-readme?view=azure-python-preview
+        self.project_client = AIProjectClient(
+            subscription_id=os.environ["AZURE_SUBSCRIPTION_ID"],
+            resource_group_name=os.environ["AZURE_RESOURCE_GROUP"],
+            project_name=os.environ["AZURE_PROJECT_NAME"],
+            credential=DefaultAzureCredential(),
+            endpoint=os.environ["AZURE_PROJECT_ENDPOINT"],
+            )
+
+        connection_string = self.project_client.telemetry.get_connection_string()
+        logger.info(
+            f"Application Insights connection string: {connection_string}")
+        
+
+        if not connection_string:
+            logger.error("Application Insights is not enabled. Enable by going to Tracing in your Azure AI Foundry project.")
+            exit()
+
+        configure_azure_monitor(connection_string=connection_string) #enable telemetry collection
+        
+        # Initialize auto-instrumentation for OpenAI and requests
+        # This automatically traces all OpenAI API calls and HTTP requests
+        logger.info("Setting up auto-instrumentation for OpenAI and requests...")
+        OpenAIInstrumentor().instrument()
+        RequestsInstrumentor().instrument()
+        logger.info("✅ Auto-instrumentation enabled for OpenAI and requests")
+        
         # Initialize search client with proper authentication
         self._init_search_client()
 
@@ -174,6 +211,7 @@ class RAGAgent:
     def _generate_embedding(self, text: str, max_retries: int = 3) -> List[float]:
         """
         Generate embedding for text using Azure OpenAI.
+        Auto-instrumentation will automatically trace the OpenAI API call.
 
         Args:
             text: Text to generate embedding for
@@ -182,25 +220,39 @@ class RAGAgent:
         Returns:
             Embedding vector as list of floats
         """
-        for attempt in range(max_retries):
-            try:
-                response = self.openai_client.embeddings.create(
-                    model=self.embedding_model,
-                    input=text
-                )
-                return response.data[0].embedding
+        with tracer.start_as_current_span("rag_agent.generate_embedding") as span:
+            span.set_attribute("embedding.model", self.embedding_model)
+            span.set_attribute("embedding.input_length", len(text))
+            span.set_attribute("embedding.max_retries", max_retries)
+            
+            for attempt in range(max_retries):
+                try:
+                    # OpenAI call will be automatically traced by auto-instrumentation
+                    response = self.openai_client.embeddings.create(
+                        model=self.embedding_model,
+                        input=text
+                    )
+                    
+                    embedding = response.data[0].embedding
+                    span.set_attribute("embedding.output_dimension", len(embedding))
+                    span.set_attribute("embedding.attempts_used", attempt + 1)
+                    return embedding
 
-            except Exception as e:
-                wait_time = 2 ** attempt  # Exponential backoff
-                logger.warning(
-                    f"Embedding generation attempt {attempt + 1} failed: {str(e)}")
+                except Exception as e:
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    logger.warning(
+                        f"Embedding generation attempt {attempt + 1} failed: {str(e)}")
+                    
+                    span.record_exception(e)
+                    span.set_attribute("embedding.error", str(e))
 
-                if attempt < max_retries - 1:
-                    logger.info(f"Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                else:
-                    logger.error("All embedding generation attempts failed")
-                    raise
+                    if attempt < max_retries - 1:
+                        logger.info(f"Retrying in {wait_time} seconds...")
+                        time.sleep(wait_time)
+                    else:
+                        logger.error("All embedding generation attempts failed")
+                        span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                        raise
 
     def retrieve_documents(self, query: str, use_hybrid: bool = True) -> List[RetrievedDocument]:
         """
@@ -213,54 +265,75 @@ class RAGAgent:
         Returns:
             List of retrieved documents with scores
         """
-        start_time = time.time()
+        with tracer.start_as_current_span("rag_agent.retrieve_documents") as span:
+            span.set_attribute("search.query", query)
+            span.set_attribute("search.use_hybrid", use_hybrid)
+            span.set_attribute("search.top_k", self.top_k_documents)
+            span.set_attribute("search.index_name", self.search_index_name)
+            
+            start_time = time.time()
 
-        try:
-            if use_hybrid:
-                # Generate embedding for semantic search
-                query_embedding = self._generate_embedding(query)
+            try:
+                if use_hybrid:
+                    # Generate embedding for semantic search
+                    query_embedding = self._generate_embedding(query)
 
-                # Perform hybrid search (keyword + semantic)
-                results = self.search_client.search(
-                    search_text=query,
-                    vector_queries=[{
-                        "kind": "vector",
-                        "vector": query_embedding,
-                        "k_nearest_neighbors": self.top_k_documents * 3,  # Get more candidates
-                        "fields": "page_vector"
-                    }],
-                    top=self.top_k_documents,
-                    include_total_count=True
-                )
-            else:
-                # Pure keyword search
-                results = self.search_client.search(
-                    search_text=query,
-                    top=self.top_k_documents,
-                    include_total_count=True
-                )
+                    # Perform hybrid search (keyword + semantic)
+                    with tracer.start_as_current_span("azure_search.hybrid_search") as search_span:
+                        search_span.set_attribute("search.type", "hybrid")
+                        search_span.set_attribute("search.vector_dimension", len(query_embedding))
+                        
+                        results = self.search_client.search(
+                            search_text=query,
+                            vector_queries=[{
+                                "kind": "vector",
+                                "vector": query_embedding,
+                                "k_nearest_neighbors": self.top_k_documents * 3,  # Get more candidates
+                                "fields": "page_vector"
+                            }],
+                            top=self.top_k_documents,
+                            include_total_count=True
+                        )
+                else:
+                    # Pure keyword search
+                    with tracer.start_as_current_span("azure_search.keyword_search") as search_span:
+                        search_span.set_attribute("search.type", "keyword")
+                        
+                        results = self.search_client.search(
+                            search_text=query,
+                            top=self.top_k_documents,
+                            include_total_count=True
+                        )
 
-            # Process results
-            retrieved_docs = []
-            for result in results:
-                doc = RetrievedDocument(
-                    docid=result.get("docid", ""),
-                    content=result.get("page", ""),
-                    score=result.get("@search.score", 0.0),
-                    metadata={"source_type": "azure_search"}
-                )
-                retrieved_docs.append(doc)
+                # Process results
+                retrieved_docs = []
+                for result in results:
+                    doc = RetrievedDocument(
+                        docid=result.get("docid", ""),
+                        content=result.get("page", ""),
+                        score=result.get("@search.score", 0.0),
+                        metadata={"source_type": "azure_search"}
+                    )
+                    retrieved_docs.append(doc)
 
-            retrieval_time = time.time() - start_time
-            search_type = "hybrid" if use_hybrid else "keyword"
-            logger.info(
-                f"Retrieved {len(retrieved_docs)} documents using {search_type} search in {retrieval_time:.3f}s")
+                retrieval_time = time.time() - start_time
+                search_type = "hybrid" if use_hybrid else "keyword"
+                
+                # Add telemetry attributes
+                span.set_attribute("search.documents_retrieved", len(retrieved_docs))
+                span.set_attribute("search.retrieval_time", retrieval_time)
+                span.set_attribute("search.type_used", search_type)
+                
+                logger.info(
+                    f"Retrieved {len(retrieved_docs)} documents using {search_type} search in {retrieval_time:.3f}s")
 
-            return retrieved_docs
+                return retrieved_docs
 
-        except Exception as e:
-            logger.error(f"Document retrieval failed: {str(e)}")
-            return []
+            except Exception as e:
+                logger.error(f"Document retrieval failed: {str(e)}")
+                span.record_exception(e)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                return []
 
     def _prepare_context(self, documents: List[RetrievedDocument]) -> str:
         """
@@ -319,6 +392,7 @@ User Question: {query}"""
     ) -> Tuple[str, float]:
         """
         Generate response using GPT-4 with retrieved context.
+        Auto-instrumentation will automatically trace the OpenAI API call.
 
         Args:
             query: User query
@@ -329,15 +403,24 @@ User Question: {query}"""
         Returns:
             Tuple of (response_text, generation_time)
         """
-        start_time = time.time()
+        with tracer.start_as_current_span("rag_agent.generate_response") as span:
+            span.set_attribute("generation.model", self.chat_model)
+            span.set_attribute("generation.max_tokens", max_tokens)
+            span.set_attribute("generation.temperature", temperature)
+            span.set_attribute("generation.query_length", len(query))
+            span.set_attribute("generation.context_length", len(context))
+            
+            start_time = time.time()
 
-        try:
-            prompt = self._create_prompt(query, context)
+            try:
+                prompt = self._create_prompt(query, context)
+                span.set_attribute("generation.prompt_length", len(prompt))
 
-            response = self.openai_client.chat.completions.create(
-                model=self.chat_model,
-                messages=[
-                    {"role": "system", "content": """You are an AI assistant helping users find information from a document collection. 
+                # OpenAI call will be automatically traced by auto-instrumentation
+                response = self.openai_client.chat.completions.create(
+                    model=self.chat_model,
+                    messages=[
+                        {"role": "system", "content": """You are an AI assistant helping users find information from a document collection. 
 Use the provided context to answer the user's question accurately and comprehensively.
 
 Instructions:
@@ -346,23 +429,33 @@ Instructions:
 3. Cite specific documents when referencing information (e.g., "According to Document 1...")
 4. Provide a helpful and detailed response
 5. If you're unsure about something, express that uncertainty"""},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=max_tokens,
-                temperature=temperature,
-                top_p=0.9
-            )
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    top_p=0.9
+                )
 
-            answer = response.choices[0].message.content
-            generation_time = time.time() - start_time
+                answer = response.choices[0].message.content
+                generation_time = time.time() - start_time
+                
+                # Add telemetry attributes for our custom metrics
+                span.set_attribute("generation.response_length", len(answer))
+                span.set_attribute("generation.time", generation_time)
+                if response.usage:
+                    span.set_attribute("generation.completion_tokens", response.usage.completion_tokens)
+                    span.set_attribute("generation.prompt_tokens", response.usage.prompt_tokens)
+                    span.set_attribute("generation.total_tokens", response.usage.total_tokens)
 
-            logger.info(
-                f"Generated response in {generation_time:.3f}s using {self.chat_model}")
-            return answer, generation_time
+                logger.info(
+                    f"Generated response in {generation_time:.3f}s using {self.chat_model}")
+                return answer, generation_time
 
-        except Exception as e:
-            logger.error(f"Response generation failed: {str(e)}")
-            return f"I apologize, but I encountered an error while generating a response: {str(e)}", 0.0
+            except Exception as e:
+                logger.error(f"Response generation failed: {str(e)}")
+                span.record_exception(e)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                return f"I apologize, but I encountered an error while generating a response: {str(e)}", 0.0
 
     def ask(self, query: str, use_hybrid_search: bool = True) -> RAGResponse:
         """
@@ -375,57 +468,74 @@ Instructions:
         Returns:
             RAGResponse with answer, sources, and timing information
         """
-        start_time = time.time()
+        with tracer.start_as_current_span("rag_agent.ask") as span:
+            span.set_attribute("rag.query", query)
+            span.set_attribute("rag.use_hybrid_search", use_hybrid_search)
+            span.set_attribute("rag.top_k_documents", self.top_k_documents)
+            span.set_attribute("rag.chat_model", self.chat_model)
+            span.set_attribute("rag.embedding_model", self.embedding_model)
+            
+            start_time = time.time()
 
-        logger.info(f"Processing query: '{query}'")
+            logger.info(f"Processing query: '{query}'")
 
-        try:
-            # Step 1: Retrieve relevant documents
-            retrieval_start = time.time()
-            documents = self.retrieve_documents(
-                query, use_hybrid=use_hybrid_search)
-            retrieval_time = time.time() - retrieval_start
+            try:
+                # Step 1: Retrieve relevant documents
+                retrieval_start = time.time()
+                documents = self.retrieve_documents(
+                    query, use_hybrid=use_hybrid_search)
+                retrieval_time = time.time() - retrieval_start
 
-            # Step 2: Prepare context from retrieved documents
-            context = self._prepare_context(documents)
+                # Step 2: Prepare context from retrieved documents
+                context = self._prepare_context(documents)
+                span.set_attribute("rag.context_length", len(context))
 
-            # Step 3: Generate response using LLM
-            answer, generation_time = self.generate_response(query, context)
+                # Step 3: Generate response using LLM
+                answer, generation_time = self.generate_response(query, context)
 
-            # Prepare sources information
-            sources = []
-            for doc in documents:
-                sources.append({
-                    "docid": doc.docid,
-                    "content_preview": doc.content[:200] + "..." if len(doc.content) > 200 else doc.content,
-                    "score": doc.score,
-                    "metadata": doc.metadata
-                })
+                # Prepare sources information
+                sources = []
+                for doc in documents:
+                    sources.append({
+                        "docid": doc.docid,
+                        "content_preview": doc.content[:200] + "..." if len(doc.content) > 200 else doc.content,
+                        "score": doc.score,
+                        "metadata": doc.metadata
+                    })
 
-            total_time = time.time() - start_time
+                total_time = time.time() - start_time
+                
+                # Add final telemetry attributes
+                span.set_attribute("rag.documents_used", len(documents))
+                span.set_attribute("rag.retrieval_time", retrieval_time)
+                span.set_attribute("rag.generation_time", generation_time)
+                span.set_attribute("rag.total_time", total_time)
+                span.set_attribute("rag.answer_length", len(answer))
 
-            logger.info(
-                f"RAG pipeline completed in {total_time:.3f}s (retrieval: {retrieval_time:.3f}s, generation: {generation_time:.3f}s)")
+                logger.info(
+                    f"RAG pipeline completed in {total_time:.3f}s (retrieval: {retrieval_time:.3f}s, generation: {generation_time:.3f}s)")
 
-            return RAGResponse(
-                answer=answer,
-                sources=sources,
-                query=query,
-                retrieval_time=retrieval_time,
-                generation_time=generation_time,
-                total_time=total_time
-            )
+                return RAGResponse(
+                    answer=answer,
+                    sources=sources,
+                    query=query,
+                    retrieval_time=retrieval_time,
+                    generation_time=generation_time,
+                    total_time=total_time
+                )
 
-        except Exception as e:
-            logger.error(f"RAG pipeline failed: {str(e)}")
-            return RAGResponse(
-                answer=f"I apologize, but I encountered an error while processing your question: {str(e)}",
-                sources=[],
-                query=query,
-                retrieval_time=0.0,
-                generation_time=0.0,
-                total_time=time.time() - start_time
-            )
+            except Exception as e:
+                logger.error(f"RAG pipeline failed: {str(e)}")
+                span.record_exception(e)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                return RAGResponse(
+                    answer=f"I apologize, but I encountered an error while processing your question: {str(e)}",
+                    sources=[],
+                    query=query,
+                    retrieval_time=0.0,
+                    generation_time=0.0,
+                    total_time=time.time() - start_time
+                )
 
 
 def main():

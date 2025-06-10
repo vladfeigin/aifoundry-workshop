@@ -1,0 +1,145 @@
+{
+  "dataset_size": 10,
+  "evaluation_metrics": {
+    "groundedness": {
+      "mean": 4.5,
+      "min": 3.0,
+      "max": 5.0,
+      "count": 10
+    },
+    "relevance": {
+      "mean": 4.7,
+      "min": 4.0,
+      "max": 5.0,
+      "count": 10
+    },
+    "completeness": {
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "count": 10
+    },
+    "intent_resolution": {
+      "mean": 5.0,
+      "min": 5.0,
+      "max": 5.0,
+      "count": 10
+    }
+  },
+  "individual_scores": [
+    {
+      "query": "What is GPT-4?",
+      "groundedness": 5.0,
+      "relevance": 5.0,
+      "completeness": 0.0,
+      "intent_resolution": 5.0,
+      "response_time": 5.454576015472412
+    },
+    {
+      "query": "How did GPT-4 perform on the bar exam?",
+      "groundedness": 5.0,
+      "relevance": 5.0,
+      "completeness": 0.0,
+      "intent_resolution": 5.0,
+      "response_time": 2.67773175239563
+    },
+    {
+      "query": "What are the main limitations of GPT-4?",
+      "groundedness": 4.0,
+      "relevance": 5.0,
+      "completeness": 0.0,
+      "intent_resolution": 5.0,
+      "response_time": 5.779225826263428
+    },
+    {
+      "query": "What is Azure AI Document Intelligence?",
+      "groundedness": 5.0,
+      "relevance": 5.0,
+      "completeness": 0.0,
+      "intent_resolution": 5.0,
+      "response_time": 4.0734169483184814
+    },
+    {
+      "query": "What types of prebuilt models does Azure Document Intelligence offer?",
+      "groundedness": 4.0,
+      "relevance": 4.0,
+      "completeness": 0.0,
+      "intent_resolution": 5.0,
+      "response_time": 3.5210468769073486
+    },
+    {
+      "query": "How does GPT-4's performance scale with compute?",
+      "groundedness": 5.0,
+      "relevance": 4.0,
+      "completeness": 0.0,
+      "intent_resolution": 5.0,
+      "response_time": 5.653888940811157
+    },
+    {
+      "query": "What custom models can be built with Azure Document Intelligence?",
+      "groundedness": 5.0,
+      "relevance": 5.0,
+      "completeness": 0.0,
+      "intent_resolution": 5.0,
+      "response_time": 5.883962154388428
+    },
+    {
+      "query": "What benchmarks was GPT-4 evaluated on?",
+      "groundedness": 3.0,
+      "relevance": 5.0,
+      "completeness": 0.0,
+      "intent_resolution": 5.0,
+      "response_time": 4.637254238128662
+    },
+    {
+      "query": "What add-on capabilities does Azure Document Intelligence provide?",
+      "groundedness": 4.0,
+      "relevance": 4.0,
+      "completeness": 0.0,
+      "intent_resolution": 5.0,
+      "response_time": 2.1178081035614014
+    },
+    {
+      "query": "What safety measures were implemented for GPT-4?",
+      "groundedness": 5.0,
+      "relevance": 5.0,
+      "completeness": 0.0,
+      "intent_resolution": 5.0,
+      "response_time": 6.99713921546936
+    }
+  ],
+  "summary_statistics": {
+    "groundedness": {
+      "mean": 4.5,
+      "min": 3.0,
+      "max": 5.0,
+      "count": 10
+    },
+    "relevance": {
+      "mean": 4.7,
+      "min": 4.0,
+      "max": 5.0,
+      "count": 10
+    },
+    "completeness": {
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "count": 10
+    },
+    "intent_resolution": {
+      "mean": 5.0,
+      "min": 5.0,
+      "max": 5.0,
+      "count": 10
+    },
+    "overall": {
+      "mean": 3.55,
+      "min": 3.25,
+      "max": 3.75,
+      "count": 10
+    }
+  },
+  "evaluation_time": 122.07081079483032,
+  "timestamp": "2025-06-10T21:45:38.552725"
+}

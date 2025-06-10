@@ -11,6 +11,9 @@ The agent follows Azure best practices:
 - Implements proper error handling and logging
 - Uses connection pooling and retry logic
 - Includes monitoring and observability
+
+Run this agent from project root with (aifoundry-workshop):
+    python -m agents.rag.rag_agent
 """
 
 import os

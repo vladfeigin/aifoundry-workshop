@@ -50,38 +50,72 @@ This repository contains code and resources for a comprehensive Azure AI Foundry
 
 ```
 aifoundry-workshop/
+├── agents/                      # AI Agents implementation
+│   ├── rag/                     # RAG (Retrieval-Augmented Generation) Agent
+│   │   ├── rag_agent.py         # Main RAG agent with Azure AI Foundry tracing
+│   │   └── README.md            # RAG agent documentation and setup
+│   └── evaluations/             # Agent evaluation framework
+│       ├── rag/                 # RAG agent evaluation module
+│       │   ├── rag_agent_eval.py           # Comprehensive evaluation module
+│       │   ├── rag_agent_eval_in_foundry.py # Cloud-based evaluation
+│       │   └── README.md        # Evaluation documentation
+│       └── data/                # Evaluation datasets
+│           ├── single-turn-eval-ds.jsonl   # Evaluation dataset
+│           └── output/          # Evaluation results
+│               ├── single-turn-eval-ds-agent-output.jsonl
+│               └── evaluation_results.json
 ├── aisearch/                    # Azure AI Search implementation
 │   ├── create_search_index.py   # Creates search index with vector fields
-│   ├── document_processor.py    # Processes documents and generates embeddings
-│   └── README.md                # Detailed setup instructions
+│   ├── ingest_documents.py       # Processes documents and generates embeddings
+│   └── README.md                # AI Search setup instructions
 ├── docintel/                    # Document Intelligence utilities
-│   ├── pdf-2-md.py             # PDF to Markdown conversion
-│   └── data/                    # Sample documents
+│   ├── pdf-2-md.py             # PDF to Markdown conversion with Azure Document Intelligence
+│   └── data/                    # Sample documents and processed outputs
 │       ├── *.pdf                # Source PDF files
 │       └── *.md                 # Converted Markdown files
-├── pyproject.toml               # Python dependencies
+├── .vscode/                     # VS Code configuration
+│   └── launch.json              # Debug configurations for all modules
+├── pyproject.toml               # Python dependencies and project configuration
+├── uv.lock                      # UV package manager lock file
+├── install_deps.sh              # Dependency installation script
 └── README.md                    # This file
 ```
 
 ## Key Features
+
+### RAG Agent with Azure AI Foundry Integration
+
+- **Intelligent Document Retrieval**: Context-aware document search and retrieval
+- **Azure AI Foundry Tracing**: Comprehensive observability and monitoring
+- **Auto-instrumentation**: OpenAI and HTTP requests automatically traced
+- **Multi-metric Evaluation**: Groundedness, Relevance, Completeness, and Intent Resolution
+
+### Agent Evaluation Framework
+
+- **Comprehensive Metrics**: Built using Azure AI Evaluation SDK
+- **Automated Testing**: Batch evaluation with performance monitoring
+- **Multiple Evaluators**: Groundedness, Relevance, Response Completeness, Intent Resolution
+- **Detailed Reporting**: JSON outputs with statistical analysis
 
 ### Azure AI Search Integration
 
 - **Vector Search**: Semantic search using embeddings
 - **Hybrid Search**: Combines keyword and vector search
 - **Document Indexing**: Automatic processing and indexing of Markdown documents
+- **Advanced Retrieval**: Context-aware document chunking and retrieval
 
 ### Azure AI Foundry Integration
 
 - **Text Embeddings**: Using Azure OpenAI text-embedding-3-small model
 - **Document Processing**: Smart page splitting and content extraction
 - **Search Capabilities**: Semantic and hybrid search functionality
+- **Observability**: Built-in tracing and monitoring capabilities
 
 ### Document Intelligence
 
-- **PDF Processing**: Convert PDF documents to Markdown format
-- **Content Extraction**: Extract and structure document content
-- **Page Segmentation**: Intelligent document page splitting
+- **PDF Processing**: Convert PDF documents to Markdown format using Azure Document Intelligence
+- **Content Extraction**: Extract and structure document content intelligently
+- **Page Segmentation**: Smart document page splitting and organization
 
 ## Getting Started
 
@@ -89,7 +123,7 @@ aifoundry-workshop/
 
 - Python 3.12+
 - Azure subscription with access to:
-  - Azure OpenAI Service
+  - Azure AI Foundry
   - Azure AI Search
   - Azure Document Intelligence
 - UV package manager (recommended) or pip
@@ -114,24 +148,63 @@ aifoundry-workshop/
 3. **Configure environment**
 
    ```bash
-   cp aisearch/.env.template aisearch/.env
-   # Edit .env with your Azure credentials
+   # Copy and edit the environment template
+   cp .env.template .env
+   # Edit .env with your Azure credentials and endpoints
    ```
-4. **Run the search index creation**
+4. **Convert PDFs to Markdown (Document Intelligence)**
 
    ```bash
-   cd aisearch
-   python create_search_index.py
+   # Convert PDF documents to Markdown format using Azure Document Intelligence
+   # This step prepares your PDF documents for indexing in Azure AI Search
+   
+   # Example: Convert a sample PDF to Markdown
+   python -m docintel.pdf-2-md ./docintel/data/GPT-4-Technical-Report.pdf ./docintel/data/GPT-4-Technical-Report.md
+   
+   # Or convert your own PDF file
+   python -m docintel.pdf-2-md path/to/your/document.pdf path/to/output/document.md
+   
+   # You can also convert from a URL
+   python -m docintel.pdf-2-md https://example.com/document.pdf ./output/document.md
    ```
-5. **Process documents**
+
+   **Note**: Ensure your `.env` file contains the Document Intelligence credentials:
+   ```env
+   AZURE_DOCINTEL_ENDPOINT=https://your-doc-intel-service.cognitiveservices.azure.com/
+   AZURE_DOCINTEL_KEY=your-doc-intel-api-key
+   ```
+
+5. **Set up Azure AI Search**
 
    ```bash
-   python document_processor.py
+   # Create search index
+   # Run from the project root folder:
+
+   python ./aisearch/create_search_index.py --search-service <service_name> --index-name <index_name>
+   or
+   python -m aisearch.create_search_index --search-service <service_name> --index-name <index_name>
+
+   Check in Azure AI Search portal, an index has been created.
+
+   # Process and ingest documents documents to the index
+   python -m aisearch.ingest_documents --search-service <service_name> --index-name <index_name> 
+   ```
+6. **Run the RAG Agent**
+
+   ```bash
+   # Test the RAG agent
+   python -m agents.rag.rag_agent
+   ```
+7. **Evaluate the RAG Agent**
+
+   ```bash
+   # Run comprehensive evaluation
+   python -m agents.evaluations.rag.rag_agent_eval
    ```
 
 ## Environment Configuration
 
-Create a `.env` file in the `aisearch/` directory with the following variables:
+Create a `.env` file in the project root with the following variables:
 
 ```env
 # Azure AI Search
@@ -142,11 +215,56 @@ AZURE_SEARCH_INDEX_NAME=your-index-name
 # Azure OpenAI
 AZURE_OPENAI_ENDPOINT=https://your-openai-service.openai.azure.com/
 AZURE_OPENAI_API_KEY=your-openai-api-key
-AZURE_OPENAI_API_VERSION=2024-05-01-preview
+AZURE_OPENAI_API_VERSION=2024-12-01-preview
 AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+AZURE_OPENAI_CHAT_MODEL=gpt-4o
+
+# Azure Document Intelligence
+AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://your-doc-intel-service.cognitiveservices.azure.com/
+AZURE_DOCUMENT_INTELLIGENCE_API_KEY=your-doc-intel-api-key
+
+# Azure AI Foundry (for evaluation and tracing)
+AZURE_SUBSCRIPTION_ID=your-subscription-id
+AZURE_RESOURCE_GROUP=your-resource-group
+AZURE_PROJECT_NAME=your-ai-foundry-project
+AZURE_PROJECT_ENDPOINT=https://your-project.your-region.api.azureml.ms
+
+# Azure Monitor (for tracing)
+APPLICATIONINSIGHTS_CONNECTION_STRING=your-app-insights-connection-string
 ```
 
 ## Usage Examples
+
+### RAG Agent Usage
+
+```python
+from agents.rag.rag_agent import RAGAgent
+
+# Initialize the RAG agent
+agent = RAGAgent(
+    search_service_name="your-search-service",
+    search_index_name="your-index-name",
+    azure_openai_endpoint="https://your-openai-service.openai.azure.com/",
+    chat_model="gpt-4o"
+)
+
+# Ask a question
+response = agent.ask("What is GPT-4?")
+print(f"Answer: {response.answer}")
+print(f"Sources: {response.sources}")
+```
+
+### Agent Evaluation
+
+```python
+from agents.evaluations.rag.rag_agent_eval import RAGAgentEvaluator
+
+# Run comprehensive evaluation
+evaluator = RAGAgentEvaluator(rag_agent, project_client)
+dataset = evaluator.load_evaluation_dataset("path/to/dataset.jsonl")
+results = evaluator.evaluate_dataset(dataset)
+evaluator.print_evaluation_summary(results)
+```
 
 ### Creating a Search Index
 
@@ -160,11 +278,34 @@ create_search_index()
 ### Processing Documents
 
 ```python
-from aisearch.document_processor import DocumentProcessor
+from aisearch.ingest_documents import DocumentProcessor
 
 processor = DocumentProcessor()
 processor.process_documents()
 ```
+
+### Document Intelligence (PDF to Markdown)
+
+```bash
+# Convert PDF documents to Markdown using Azure Document Intelligence
+# This is typically the first step in the document processing pipeline
+
+# Convert a local PDF file
+python -m docintel.pdf-2-md ./docintel/data/GPT-4-Technical-Report.pdf ./docintel/data/GPT-4-Technical-Report.md
+
+# Convert from a URL
+python -m docintel.pdf-2-md https://example.com/document.pdf ./output/document.md
+
+# Convert with custom output location
+python -m docintel.pdf-2-md /path/to/your/document.pdf /path/to/output/document.md
+```
+
+**Features:**
+- Smart content extraction from PDF documents
+- Table recognition and Markdown table formatting
+- Page-by-page processing with clear delineation
+- Support for both local files and HTTP URLs
+- Rich progress indicators during processing
 
 ### Searching Documents
 
@@ -176,6 +317,38 @@ results = processor.search_documents("your search query")
 results = processor.hybrid_search("your search query")
 ```
 
+## Development and Debugging
+
+### VS Code Integration
+
+The project includes comprehensive VS Code debugging configurations:
+
+- **Debug RAG Agent Evaluation Module**: For debugging the evaluation framework
+- **Debug RAG Agent**: For debugging the main RAG agent
+- **Debug Document Ingestion (aisearch)**: For debugging AI Search integration
+- **Debug Create Search Index (aisearch)**: For debugging index creation
+- **Debug PDF to Markdown (docintel)**: For debugging document intelligence
+
+### Running Modules
+
+```bash
+# Run individual modules
+python -m agents.rag.rag_agent
+python -m agents.evaluations.rag.rag_agent_eval
+python -m aisearch.create_search_index
+python -m aisearch.ingest_documents
+python -m docintel.pdf-2-md
+```
+
+### Evaluation Metrics
+
+The evaluation framework provides comprehensive metrics:
+
+- **Groundedness**: Measures if responses are supported by retrieved context
+- **Relevance**: Evaluates response relevance to user queries
+- **Response Completeness**: Assesses if responses fully address queries
+- **Intent Resolution**: Determines if responses resolve user intent
+
 ## Contributing
 
 This workshop is designed for learning purposes. Feel free to:
@@ -183,6 +356,9 @@ This workshop is designed for learning purposes. Feel free to:
 - Experiment with different models and configurations
 - Add new document processing capabilities
 - Enhance search functionality
+- Improve evaluation metrics and datasets
+- Add new agent capabilities
+- Enhance observability and tracing
 - Improve error handling and logging
 
 ## Resources
@@ -191,6 +367,19 @@ This workshop is designed for learning purposes. Feel free to:
 - [Azure AI Search Documentation](https://docs.microsoft.com/azure/search/)
 - [Azure OpenAI Service Documentation](https://docs.microsoft.com/azure/cognitive-services/openai/)
 - [Azure Document Intelligence Documentation](https://docs.microsoft.com/azure/cognitive-services/document-intelligence/)
+- [Azure AI Evaluation SDK](https://docs.microsoft.com/azure/ai-foundry/how-to/evaluate-generative-ai-app)
+- [Azure Monitor OpenTelemetry](https://docs.microsoft.com/azure/azure-monitor/app/opentelemetry-enable)
+
+## Architecture Overview
+
+The workshop demonstrates a production-ready RAG architecture:
+
+1. **Document Processing**: Azure Document Intelligence converts PDFs to structured Markdown
+2. **Indexing**: Azure AI Search creates vector embeddings and indexes documents
+3. **Retrieval**: Hybrid search combines semantic and keyword matching
+4. **Generation**: Azure OpenAI generates contextual responses
+5. **Evaluation**: Multi-metric assessment ensures quality and performance
+6. **Observability**: Azure AI Foundry provides comprehensive tracing and monitoring
 
 ## License
 

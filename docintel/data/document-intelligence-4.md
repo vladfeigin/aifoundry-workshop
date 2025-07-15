@@ -3141,9 +3141,6 @@ Compensation
 #2
 Payer
 =
-Copy A
-For Internal Revenue
-Service Center
 PhoneNumber
 7171
 85.50%
@@ -3151,6 +3148,9 @@ PAYER'S TIN
 RECIPIENT'S TIN
 1 Nonemployee compensation
 $
+Copy A
+For Internal Revenue
+Service Center
 RECIPIENT'S name
 2 Payer made direct sales totaling $5,000 or more of
 consumer products to recipient for resale
@@ -3176,10 +3176,10 @@ $
 99.90%
 5 State tax withheld
 6 State/Payer's state no.
-Account number (see instructions)
 2nd TIN not.
 7 State income
 $
+Account number (see instructions)
 $
 $
 $
@@ -3202,7 +3202,7 @@ prebuilt-tax.us.1099{ variation}
 · C# SDK
 · Python SDK
 · Java SDK
-· JavaScript
+. JavaScript
 Return to model types
 US tax 1040 (and variations) forms
 Og Run analysis
@@ -3218,7 +3218,6 @@ U.S. Individual Income Tax Return
 OMB No. 1545-0074
 IRS Use Only-Do not write or staple in this space.
 See separate instructions
-4
 For the year Jan. 1-Dec. 31, 2023, or other tax year beginning
 January 1st
 2023, ending
@@ -3226,10 +3225,10 @@ December 31st
 20 23
 Your first name and middle initial
 Pascale
-Last name
 Your social security number
 12 34 5 6 7 8 9
 DocType: tax.us.1040.2022
+Last name
 Weydert
 I joint retum, spouse's first name and middle initial
 Johr
@@ -3244,7 +3243,7 @@ Home address (number and street). if you have a P.O. box, see instructions.
 Apt. no.
 Presidential Election Campaign
 Check here if you, or your
-spouse if ting jointy, want $3
+spouse if fing jointy, want $3
 to go to this lund, Checking a
 box below will not change
 You
@@ -3263,16 +3262,16 @@ Foreign province/state/county
 Foreign postal code
 Filing Status
 Check only
-one box
+one box.
 Married filing jointly (even if only one had income)
 Married filing separately (MFS)
 Single
 Head of household (HOH)
 Taxpayer
 #1
-=
-Qualifying surviving spouse (QSS)
-If you checked the MFS box, enter the name of your spouse. If you checked the HOH or OSS box, enter the child's name if the
+E
+Qualifying surviving spouse (OSS)
+If you checked the MFS box, enter the name of your spouse. If you checked the HOH or QSS box, enter the child's name if the
 qualifying person is a child but not your dependent:
 SSN
 81.40%
@@ -3299,7 +3298,7 @@ Income
 1a
 Total amount from Form(s) W-2, box 1 (see instructions)
 1a
-H47 65-400
+H47/ 05-400
 DAL MA
 Age/Blindness You
 Were born before January 2, 1959
@@ -3320,8 +3319,9 @@ If more
 Last name
 than four
 dependents
-Elton Weyder
-structions
+Elton Wayder
+53
+Sometructions
 see instructions
 and check
 here
@@ -3330,31 +3330,30 @@ Expand table
 Model ID
 Description
 Development options
-prebuilt-tax.us.1040{ variation }
+prebuilt-tax.us.1040{variation }
 . Extract information from 1040-form variations.
 ●
 . Document Intelligence Studio
-. REST API
+· REST API
 · C# SDK
 
 | Model ID | Description | Development options |
 | --- | --- | --- |
 | prebuilt-tax.us.1099{ variation} | . Extract information from 1099-form variations. ● | · Document Intelligence Studio |
 |  |  | · REST API · C# SDK · Python SDK · Java SDK |
-|  |  | · JavaScript |
+|  |  | . JavaScript |
 
 | Age/Blindness You :unselected: :unselected: :unselected: :selected: Were born before January 2, 1959 Are blind Spouse: Was bom before January 2, 1959 s blind |  |  |  |  |  |  |  |  |  |  |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Dependents (see instructions): |  |  | (2) Social security number | (3) Relationship to you | (4) Check the box If |  |  | qualifies for (see instructions): |  |  |
-| If more | (1) First name | Last name |  |  | Child tươi |  | credin | Credit for | other | dependents |
-| than four | Elton Weyder |  |  | :selected: |  |  | :selected: |  | :unselected: |  |
-| dependents structions |  |  |  |  |  |  | :unselected: |  | :unselected: |  |
-| see instructions and check |  |  |  |  |  |  | :unselected: |  | :unselected: |  |
-| here :unselected: |  |  |  |  |  |  | :unselected: |  | :unselected: |  |
+| If more | (1) First name | Last name |  |  |  | Child | tươi credin | Credit for | other | dependents |
+| than four | Elton Wayder |  | 53 | :selected: |  |  | :selected: |  | :unselected: |  |
+| dependents Sometructions |  |  |  |  |  |  | :unselected: |  | :unselected: |  |
+| see instructions and check here :unselected: |  |  |  |  |  |  | :unselected: :unselected: |  | :unselected: :unselected: |  |
 
 | Model ID | Description | Development options |
 | --- | --- | --- |
-| prebuilt-tax.us.1040{ variation } | . Extract information from 1040-form variations. ● | . Document Intelligence Studio . REST API · C# SDK |
+| prebuilt-tax.us.1040{variation } | . Extract information from 1040-form variations. ● | . Document Intelligence Studio · REST API · C# SDK |
 
 
 <!---- Page 20 ---------------------------------------------------------------------------------------------------------------------------------->
@@ -4602,7 +4601,7 @@ Los
 That's it! You're now ready to start automating data extraction using Azure AI Document
 Intelligence.
 Next steps
-· Try the Document Intelligence Studio, an online tool for visually exploring,
+. Try the Document Intelligence Studio, an online tool for visually exploring,
 understanding, and integrating features from the Document Intelligence service
 into your applications.
 · Complete a Document Intelligence quickstart and get started creating a document
@@ -34555,7 +34554,7 @@ they're tailored to your documents.
 addition to text language information.
 · Classifiers - Build custom classifiers to categorize documents into predefined
 classes.
-Source code [ | Package (Maven) | API reference documentation | Product
+Source code | Package (Maven) | API reference documentation | Product
 Documentation | Samples [
 Getting started
 Prerequisites
@@ -35150,7 +35149,7 @@ Create and authenticate a DocumentIntelligenceClient
 To use an Azure Active Directory (AAD) token credential , provide an instance of the desired
 credential type obtained from the @azure/identity library.
 To authenticate with AAD, you must first npm install @azure/identity
-After setup, you can choose which type of credential from @azure/identity to use. As an
+After setup, you can choose which type of credential z from @azure/identity to use. As an
 example, DefaultAzureCredential can be used to authenticate the client.
 Set the values of the client ID, tenant ID, and client secret of the AAD application as
 environment variables: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET

@@ -6,8 +6,13 @@ This script demonstrates:
 2. Creating embeddings using Azure AI Foundry (Azure OpenAI) models
 3. Populating the search index with real document content
 4. Using API key authentication for Azure AI Foundry
+
+Usage:
+From the project root directory:
+    python ./aisearch/document_processor.py --search-service <service_name> --index-name <index_name>
 """
 
+import argparse
 import os
 import hashlib
 from pathlib import Path
@@ -15,8 +20,13 @@ from typing import List, Dict, Any, Optional
 import logging
 import asyncio
 import re
-import re
-from create_search_index import SearchIndexCreator
+
+# Handle imports for both direct execution and module execution
+try:
+    from .create_search_index import SearchIndexCreator
+except ImportError:
+    from create_search_index import SearchIndexCreator
+
 from azure.search.documents import SearchClient
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents.indexes import SearchIndexClient
@@ -421,12 +431,26 @@ class DocumentProcessor:
 
 def main():
     """
-    Main function to demonstrate document processing and search with Azure AI Foundry.
+    Main function to handle command line arguments and process documents.
     """
+    parser = argparse.ArgumentParser(description="Process documents and populate Azure AI Search index")
+    parser.add_argument(
+        "--search-service",
+        required=True,
+        help="Name of the Azure AI Search service"
+    )
+    parser.add_argument(
+        "--index-name",
+        required=True,
+        help="Name of the index to populate"
+    )
+    
+    args = parser.parse_args()
+    
     # Configuration - can be set via environment variables
-    search_service_name = os.getenv("AZURE_SEARCH_SERVICE_NAME", "your-search-service")
+    search_service_name = args.search_service
+    index_name = args.index_name
     azure_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-    index_name = "ai-foundry-workshop-index-v1"
     data_directory = "./docintel/data"  # Path to markdown files
     embedding_model = os.getenv("AZURE_OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
     
@@ -434,11 +458,6 @@ def main():
     print(f"azure_openai_endpoint = {azure_openai_endpoint}.")
 
     # Validate required configuration
-    if search_service_name == "your-search-service":
-        print("❌ Error: Please set AZURE_SEARCH_SERVICE_NAME environment variable")
-        print("   Example: export AZURE_SEARCH_SERVICE_NAME=your-actual-service-name")
-        return
-    
     if not azure_openai_endpoint:
         print("❌ Error: Please set AZURE_OPENAI_ENDPOINT environment variable")
         print("   Example: export AZURE_OPENAI_ENDPOINT=https://your-openai-service.openai.azure.com/")

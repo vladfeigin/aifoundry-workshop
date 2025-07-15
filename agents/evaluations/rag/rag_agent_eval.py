@@ -371,11 +371,17 @@ class RAGAgentEvaluator:
                 context=datapoint.context
             )
             
+            # Log parameters for completeness evaluator
+            logger.info("Completeness evaluator parameters - query: %s, response: %s, ground_truth: %s", 
+                       datapoint.query[:50], datapoint.agent_response[:100], datapoint.ground_truth[:100])
+            
             completeness_result = self.completeness_evaluator(
                 query=datapoint.query,
                 response=datapoint.agent_response,
                 ground_truth=datapoint.ground_truth
             )
+            
+            logger.info("Completeness evaluator result: %s", completeness_result)
             
             intent_result = self.intent_evaluator(
                 query=datapoint.query,
@@ -504,11 +510,8 @@ def main():
         # Initialize Azure AI Project Client
         logger.info("Initializing Azure AI Project Client...")
         project_client = AIProjectClient(
-            subscription_id=os.environ["AZURE_SUBSCRIPTION_ID"],
-            resource_group_name=os.environ["AZURE_RESOURCE_GROUP"],
-            project_name=os.environ["AZURE_PROJECT_NAME"],
             credential=DefaultAzureCredential(),
-            endpoint=os.environ["AZURE_PROJECT_ENDPOINT"],
+            endpoint=os.environ["PROJECT_ENDPOINT"],
         )
         
         # Initialize RAG Agent
@@ -537,7 +540,7 @@ def main():
         # Load evaluation dataset
         dataset = evaluator.load_evaluation_dataset(str(dataset_path))
         
-        # Run RAG agent on all queries
+        # Run RAG agent on all queries and add responses to the evaluation dataset
         logger.info("🤖 Running RAG agent on evaluation dataset...")
         dataset_with_responses = evaluator.single_turn_agent_run(
             dataset=dataset,

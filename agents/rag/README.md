@@ -513,7 +513,7 @@ The RAG agent requires the following Azure SDK packages:
 ## Related Components
 
 - **Search Index Creation**: See `../../aisearch/create_search_index.py`
-- **Document Processing**: See `../../aisearch/document_processor.py`
+- **Document Processing**: See `../../aisearch/ingest_documents.py`
 - **Document Intelligence**: See `../../docintel/pdf-2-md.py`
 
 ## Contributing

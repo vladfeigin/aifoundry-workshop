@@ -1,11 +1,11 @@
 # Azure AI Foundry Workshop
 
-This repository contains code and resources for a comprehensive Azure AI Foundry workshop focusing on building intelligent document processing, search solutions using Azure AI services and Azure AI Foundry.
+This repository contains code and resources for a comprehensive Azure AI Foundry workshop focusing on building intelligent document processing, search solutions and AI Agents using Azure AI services and Azure AI Foundry.
 
 ## Workshop Goals
 
 - **Explain** the core mechanics of large-language models (LLMs) and retrieval-augmented generation (RAG) so that participants can articulate when and why to combine the two in enterprise solutions
-- **Apply** Azure AI Services — Document Intelligence, AI Search, and Azure OpenAI — to solve a realistic extraction-and-chat scenario during guided labs
+- **Apply** Azure AI Services — Document Intelligence, AI Search, and Azure AI Foundry — to solve a realistic extraction-and-chat scenario during guided labs
 - **Build** and **evaluate** multi-agent solutions in **Azure AI Foundry**, including model catalog selection, data indexing, agent orchestration via MCP, and built-in observability dashboards
 - **Implement** responsible-AI controls (content filters and prompt shields) that satisfy Microsoft's safety baseline for generative AI workloads
 - **Design** a reference-grade architecture for agentic applications, balancing accuracy, latency, cost, and governance
@@ -28,13 +28,12 @@ This repository contains code and resources for a comprehensive Azure AI Foundry
 ### 3. Azure AI Foundry (3 hours)
 
 - Model Catalog
-- AI Agents
+- AI Agents Intro
 - Agent Service
-- Data Indexing
 - AI Agents Observability
 - AI Agents Evaluations
 - Playground
-- **Demo + Hands-on**: Agent Service (create agent A, B, communicate between them + MCP)
+- **Demo + Labs**
 
 ### 4. Azure Responsible AI and Security (30 minutes)
 
@@ -83,17 +82,17 @@ aifoundry-workshop/
 
 ## Key Features
 
-### RAG Agent with Azure AI Foundry Integration
+### RAG Agent in Agent Service
 
 - **Intelligent Document Retrieval**: Context-aware document search and retrieval
 - **Azure AI Foundry Tracing**: Comprehensive observability and monitoring
 - **Auto-instrumentation**: OpenAI and HTTP requests automatically traced
 - **Multi-metric Evaluation**: Groundedness, Relevance, Completeness, and Intent Resolution
 
-### Agent Evaluation Framework
+### Foundry Agent Evaluation Framework
 
 - **Comprehensive Metrics**: Built using Azure AI Evaluation SDK
-- **Automated Testing**: Batch evaluation with performance monitoring
+- **Automated Evaluation**: Batch evaluation with performance monitoring
 - **Multiple Evaluators**: Groundedness, Relevance, Response Completeness, Intent Resolution
 - **Detailed Reporting**: JSON outputs with statistical analysis
 
@@ -104,14 +103,7 @@ aifoundry-workshop/
 - **Document Indexing**: Automatic processing and indexing of Markdown documents
 - **Advanced Retrieval**: Context-aware document chunking and retrieval
 
-### Azure AI Foundry Integration
-
-- **Text Embeddings**: Using Azure OpenAI text-embedding-3-small model
-- **Document Processing**: Smart page splitting and content extraction
-- **Search Capabilities**: Semantic and hybrid search functionality
-- **Observability**: Built-in tracing and monitoring capabilities
-
-### Document Intelligence
+### Azure Document Intelligence Service
 
 - **PDF Processing**: Convert PDF documents to Markdown format using Azure Document Intelligence
 - **Content Extraction**: Extract and structure document content intelligently
@@ -127,6 +119,7 @@ aifoundry-workshop/
   - Azure AI Search
   - Azure Document Intelligence
 - UV package manager (recommended) or pip
+- Participants should have "Azure AI User" role
 
 ### Quick Setup
 
@@ -157,23 +150,23 @@ aifoundry-workshop/
    ```bash
    # Convert PDF documents to Markdown format using Azure Document Intelligence
    # This step prepares your PDF documents for indexing in Azure AI Search
-   
+
    # Example: Convert a sample PDF to Markdown
    python -m docintel.pdf-2-md ./docintel/data/GPT-4-Technical-Report.pdf ./docintel/data/GPT-4-Technical-Report.md
-   
+
    # Or convert your own PDF file
    python -m docintel.pdf-2-md path/to/your/document.pdf path/to/output/document.md
-   
+
    # You can also convert from a URL
    python -m docintel.pdf-2-md https://example.com/document.pdf ./output/document.md
    ```
 
    **Note**: Ensure your `.env` file contains the Document Intelligence credentials:
+
    ```env
    AZURE_DOCINTEL_ENDPOINT=https://your-doc-intel-service.cognitiveservices.azure.com/
    AZURE_DOCINTEL_KEY=your-doc-intel-api-key
    ```
-
 5. **Set up Azure AI Search**
 
    ```bash
@@ -186,7 +179,7 @@ aifoundry-workshop/
 
    Check in Azure AI Search portal, an index has been created.
 
-   # Process and ingest documents documents to the index
+   # Ingest documents documents to the index
    python -m aisearch.ingest_documents --search-service <service_name> --index-name <index_name> 
    ```
 6. **Run the RAG Agent**
@@ -301,6 +294,7 @@ python -m docintel.pdf-2-md /path/to/your/document.pdf /path/to/output/document.
 ```
 
 **Features:**
+
 - Smart content extraction from PDF documents
 - Table recognition and Markdown table formatting
 - Page-by-page processing with clear delineation

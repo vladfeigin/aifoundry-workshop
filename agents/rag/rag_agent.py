@@ -11,6 +11,9 @@ The agent follows Azure best practices:
 - Implements proper error handling and logging
 - Uses connection pooling and retry logic
 - Includes monitoring and observability
+
+Run this agent from project root with (aifoundry-workshop):
+    python -m agents.rag.rag_agent
 """
 
 import os
@@ -41,7 +44,6 @@ logger = logging.getLogger(__name__)
 
 # Get tracer for OpenTelemetry spans
 tracer = trace.get_tracer(__name__)
-
 
 
 @dataclass
@@ -112,34 +114,33 @@ class RAGAgent:
         self.max_context_length = max_context_length
         self.top_k_documents = top_k_documents
 
-        #for more details see:
-        #https://learn.microsoft.com/en-us/python/api/overview/azure/ai-projects-readme?view=azure-python-preview
+        # for more details see:
+        # https://learn.microsoft.com/en-us/python/api/overview/azure/ai-projects-readme?view=azure-python-preview
         self.project_client = AIProjectClient(
-            subscription_id=os.environ["AZURE_SUBSCRIPTION_ID"],
-            resource_group_name=os.environ["AZURE_RESOURCE_GROUP"],
-            project_name=os.environ["AZURE_PROJECT_NAME"],
             credential=DefaultAzureCredential(),
-            endpoint=os.environ["AZURE_PROJECT_ENDPOINT"],
-            )
+            endpoint=os.environ["PROJECT_ENDPOINT"],
+        )
 
         connection_string = self.project_client.telemetry.get_connection_string()
         logger.info(
             f"Application Insights connection string: {connection_string}")
-        
 
         if not connection_string:
-            logger.error("Application Insights is not enabled. Enable by going to Tracing in your Azure AI Foundry project.")
+            logger.error(
+                "Application Insights is not enabled. Enable by going to Tracing in your Azure AI Foundry project.")
             exit()
 
-        configure_azure_monitor(connection_string=connection_string) #enable telemetry collection
-        
+        # enable telemetry collection
+        configure_azure_monitor(connection_string=connection_string)
+
         # Initialize auto-instrumentation for OpenAI and requests
         # This automatically traces all OpenAI API calls and HTTP requests
-        logger.info("Setting up auto-instrumentation for OpenAI and requests...")
+        logger.info(
+            "Setting up auto-instrumentation for OpenAI and requests...")
         OpenAIInstrumentor().instrument()
         RequestsInstrumentor().instrument()
         logger.info("✅ Auto-instrumentation enabled for OpenAI and requests")
-        
+
         # Initialize search client with proper authentication
         self._init_search_client()
 
@@ -224,7 +225,7 @@ class RAGAgent:
             span.set_attribute("embedding.model", self.embedding_model)
             span.set_attribute("embedding.input_length", len(text))
             span.set_attribute("embedding.max_retries", max_retries)
-            
+
             for attempt in range(max_retries):
                 try:
                     # OpenAI call will be automatically traced by auto-instrumentation
@@ -232,9 +233,10 @@ class RAGAgent:
                         model=self.embedding_model,
                         input=text
                     )
-                    
+
                     embedding = response.data[0].embedding
-                    span.set_attribute("embedding.output_dimension", len(embedding))
+                    span.set_attribute(
+                        "embedding.output_dimension", len(embedding))
                     span.set_attribute("embedding.attempts_used", attempt + 1)
                     return embedding
 
@@ -242,7 +244,7 @@ class RAGAgent:
                     wait_time = 2 ** attempt  # Exponential backoff
                     logger.warning(
                         f"Embedding generation attempt {attempt + 1} failed: {str(e)}")
-                    
+
                     span.record_exception(e)
                     span.set_attribute("embedding.error", str(e))
 
@@ -250,8 +252,10 @@ class RAGAgent:
                         logger.info(f"Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
                     else:
-                        logger.error("All embedding generation attempts failed")
-                        span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                        logger.error(
+                            "All embedding generation attempts failed")
+                        span.set_status(trace.Status(
+                            trace.StatusCode.ERROR, str(e)))
                         raise
 
     def retrieve_documents(self, query: str, use_hybrid: bool = True) -> List[RetrievedDocument]:
@@ -270,7 +274,7 @@ class RAGAgent:
             span.set_attribute("search.use_hybrid", use_hybrid)
             span.set_attribute("search.top_k", self.top_k_documents)
             span.set_attribute("search.index_name", self.search_index_name)
-            
+
             start_time = time.time()
 
             try:
@@ -281,8 +285,9 @@ class RAGAgent:
                     # Perform hybrid search (keyword + semantic)
                     with tracer.start_as_current_span("azure_search.hybrid_search") as search_span:
                         search_span.set_attribute("search.type", "hybrid")
-                        search_span.set_attribute("search.vector_dimension", len(query_embedding))
-                        
+                        search_span.set_attribute(
+                            "search.vector_dimension", len(query_embedding))
+
                         results = self.search_client.search(
                             search_text=query,
                             vector_queries=[{
@@ -298,7 +303,7 @@ class RAGAgent:
                     # Pure keyword search
                     with tracer.start_as_current_span("azure_search.keyword_search") as search_span:
                         search_span.set_attribute("search.type", "keyword")
-                        
+
                         results = self.search_client.search(
                             search_text=query,
                             top=self.top_k_documents,
@@ -318,12 +323,13 @@ class RAGAgent:
 
                 retrieval_time = time.time() - start_time
                 search_type = "hybrid" if use_hybrid else "keyword"
-                
+
                 # Add telemetry attributes
-                span.set_attribute("search.documents_retrieved", len(retrieved_docs))
+                span.set_attribute(
+                    "search.documents_retrieved", len(retrieved_docs))
                 span.set_attribute("search.retrieval_time", retrieval_time)
                 span.set_attribute("search.type_used", search_type)
-                
+
                 logger.info(
                     f"Retrieved {len(retrieved_docs)} documents using {search_type} search in {retrieval_time:.3f}s")
 
@@ -409,7 +415,7 @@ User Question: {query}"""
             span.set_attribute("generation.temperature", temperature)
             span.set_attribute("generation.query_length", len(query))
             span.set_attribute("generation.context_length", len(context))
-            
+
             start_time = time.time()
 
             try:
@@ -438,14 +444,17 @@ Instructions:
 
                 answer = response.choices[0].message.content
                 generation_time = time.time() - start_time
-                
+
                 # Add telemetry attributes for our custom metrics
                 span.set_attribute("generation.response_length", len(answer))
                 span.set_attribute("generation.time", generation_time)
                 if response.usage:
-                    span.set_attribute("generation.completion_tokens", response.usage.completion_tokens)
-                    span.set_attribute("generation.prompt_tokens", response.usage.prompt_tokens)
-                    span.set_attribute("generation.total_tokens", response.usage.total_tokens)
+                    span.set_attribute(
+                        "generation.completion_tokens", response.usage.completion_tokens)
+                    span.set_attribute(
+                        "generation.prompt_tokens", response.usage.prompt_tokens)
+                    span.set_attribute(
+                        "generation.total_tokens", response.usage.total_tokens)
 
                 logger.info(
                     f"Generated response in {generation_time:.3f}s using {self.chat_model}")
@@ -474,7 +483,7 @@ Instructions:
             span.set_attribute("rag.top_k_documents", self.top_k_documents)
             span.set_attribute("rag.chat_model", self.chat_model)
             span.set_attribute("rag.embedding_model", self.embedding_model)
-            
+
             start_time = time.time()
 
             logger.info(f"Processing query: '{query}'")
@@ -491,7 +500,8 @@ Instructions:
                 span.set_attribute("rag.context_length", len(context))
 
                 # Step 3: Generate response using LLM
-                answer, generation_time = self.generate_response(query, context)
+                answer, generation_time = self.generate_response(
+                    query, context)
 
                 # Prepare sources information
                 sources = []
@@ -504,7 +514,7 @@ Instructions:
                     })
 
                 total_time = time.time() - start_time
-                
+
                 # Add final telemetry attributes
                 span.set_attribute("rag.documents_used", len(documents))
                 span.set_attribute("rag.retrieval_time", retrieval_time)

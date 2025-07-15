@@ -7,7 +7,8 @@ This script creates an Azure AI Search index with the following fields:
 3. page_vector - Embedding vector of the page content
 
 Usage:
-    python create_search_index.py --search-service <service_name> --index-name <index_name>
+From the project root directory:
+    python ./aisearch/create_search_index.py --search-service <service_name> --index-name <index_name>
 """
 
 import argparse

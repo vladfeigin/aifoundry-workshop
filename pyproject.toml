@@ -17,4 +17,5 @@ dependencies = [
     "opentelemetry-instrumentation-openai>=0.32.0",
     "opentelemetry-instrumentation-requests>=0.49.0",
     "opentelemetry-instrumentation>=0.49.0",
+    "azure-ai-evaluation>=1.8.0",
 ]

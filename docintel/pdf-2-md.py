@@ -13,7 +13,7 @@ AZURE_DOCINTEL_KEY="your-key"
 Usage
 -----
 python pdf_to_markdown.py <local_pdf_or_https_url> [output.md]
-python ./docintel/pdf-2-md.py ./docintel/data/azure-ai-foundry.pdf   ./docintel/data/azure-ai-foundry.md
+python ./docintel/pdf-2-md.py ./docintel/data/document-intelligence-4.pdf   ./docintel/data/document-intelligence-4.md
 """
 import os, sys, textwrap
 from pathlib import Path

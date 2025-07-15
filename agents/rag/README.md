@@ -18,20 +18,6 @@ The RAG agent implements the following workflow:
 - **Configurable Retrieval**: Adjustable top-k documents, context length, and search parameters
 - **Smart Context Management**: Automatically handles context window limits
 
-### 🛡️ **Azure Best Practices**
-
-- **Managed Identity Support**: Prefers managed identity over API keys for production security
-- **Error Handling**: Comprehensive retry logic with exponential backoff
-- **Performance Monitoring**: Tracks retrieval and generation times
-- **Logging**: Detailed logging for debugging and observability
-
-### 🚀 **Production Ready**
-
-- **Type Safety**: Full type annotations with dataclasses for structured responses
-- **Configuration**: Environment-based configuration with sensible defaults
-- **Authentication**: Supports both API key (development) and managed identity (production)
-- **Observability**: Built-in performance metrics and timing
-
 ### 📊 **Azure AI Foundry Tracing & Observability**
 
 - **Auto-Instrumentation**: Automatic tracing of OpenAI API calls and HTTP requests
@@ -185,7 +171,8 @@ with tracer.start_as_current_span("rag_agent.generate_response") as span:
   "total_tokens": 1700,
   "response_time": "2.3s",
   "temperature": 0.1,
-  "max_tokens": 1000
+  "max_tokens": 1000,
+  "top_p": 0.9
 }
 ```
 
@@ -241,33 +228,7 @@ with tracer.start_as_current_span("rag_agent.generate_response") as span:
 - Compare successful vs failed request patterns
 - Monitor attribute trends over time for optimization
 
-### Best Practices
-
-#### 1. **Attribute Naming**
-
-- Use consistent naming conventions (e.g., `search.`, `generation.`, `embedding.`)
-- Include relevant business context in span names
-- Add meaningful attributes for filtering and analysis
-
-#### 2. **Error Handling**
-
-- Always record exceptions in spans: `span.record_exception(e)`
-- Set appropriate span status: `span.set_status(trace.Status(...))`
-- Include error context in attributes
-
-#### 3. **Performance Optimization**
-
-- Use spans to identify bottlenecks in the RAG pipeline
-- Monitor token usage to optimize costs
-- Track context window utilization for efficiency
-
-#### 4. **Security Considerations**
-
-- Avoid logging sensitive data in span attributes
-- Use span events for detailed debugging without exposing data
-- Configure sampling rates for high-volume scenarios
-
-## Architecture
+### Architecture
 
 ### System Design
 
@@ -287,9 +248,9 @@ Structured Response
 
 ### Prompt Architecture
 
-- **System Message**: Contains detailed instructions for how to use context, cite sources, and handle limitations
-- **User Message**: Contains only the retrieved document context and user question
-- **Clean Separation**: No redundant instructions between system and user prompts
+- **System Message**: Contains detailed instructions for using context, citing sources, handling limitations, and expressing uncertainty when information is incomplete
+- **User Message**: Contains retrieved document context formatted with document IDs, scores, and the user question
+- **Parameters**: Uses temperature=0.1 and top_p=0.9 for balanced creativity and consistency
 
 ## Quick Start
 
@@ -309,6 +270,7 @@ AZURE_OPENAI_API_KEY=your-openai-api-key
 
 # Model configuration (optional)
 AZURE_OPENAI_CHAT_MODEL=gpt-4.1
+AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
 ### 2. Run the Demo
@@ -333,8 +295,8 @@ from rag_agent import RAGAgent
 agent = RAGAgent(
     search_service_name="your-search-service",
     search_index_name="ai-foundry-workshop-index-v1", 
-    azure_openai_endpoint="https://your-openai.openai.azure.com/",
-    chat_model="gpt-4",
+    azure_openai_endpoint="https://your-openai.cognitiveservices.azure.com/",
+    chat_model="gpt-4.1",
     top_k_documents=3
 )
 
@@ -475,22 +437,7 @@ The RAG agent includes comprehensive error handling:
 
 ### Common Issues
 
-1. **"Failed to initialize search client"**
-
-   - Check `AZURE_SEARCH_SERVICE_NAME` environment variable
-   - Verify API key or managed identity permissions
-2. **"Failed to initialize OpenAI client"**
-
-   - Check `AZURE_OPENAI_ENDPOINT` environment variable
-   - Verify API key or managed identity permissions
-3. **"No relevant documents found"**
-
-   - Check if the search index contains documents
-   - Verify index name matches `AZURE_SEARCH_INDEX_NAME`
-4. **"Context limit reached"**
-
-   - Increase `max_context_length` parameter
-   - Reduce `top_k_documents` to retrieve fewer documents
+1. ...
 
 ### Debug Mode
 

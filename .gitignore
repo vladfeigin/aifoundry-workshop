@@ -12,3 +12,4 @@ aisearch/.env
 docintel/.env
 docintel/data/azure-ai-foundry.pdf
 .env
+docintel/.env_del

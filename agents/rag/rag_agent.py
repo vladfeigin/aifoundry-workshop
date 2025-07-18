@@ -1,36 +1,44 @@
 """
-RAG (Retrieval Augmented Generation) Agent
+RAG (Retrieval Augmented Generation) Agent using Azure AI Agent Service
 
-This module implements a RAG agent that:
-1. Takes a user question
-2. Searches Azure AI Search index for relevant documents
-3. Sends the context and question to GPT-4 for generating an answer
+This module implements a RAG agent using Azure AI Agent Service SDK that:
+1. Creates an agent with access to Azure AI Search tools
+2. Takes user questions and retrieves relevant documents
+3. Generates responses using the agent service with retrieved context
 
-The agent follows Azure best practices:
-- Uses managed identity when possible
-- Implements proper error handling and logging
-- Uses connection pooling and retry logic
-- Includes monitoring and observability
+The agent uses Azure AI Agent Service features:
+- Built-in tool integration for Azure AI Search
+- Managed conversation threads
+- Auto-instrumentation and tracing
+- Error handling and retry logic
 
-Run this agent from project root with (aifoundry-workshop):
-    python -m agents.rag.rag_agent
+Run this agent from project root with:
+    python -m agents.rag.rag_agent_asrv
 """
 
 import os
 import logging
 import time
-from typing import List, Dict, Any, Optional, Tuple
+import traceback
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
-from azure.search.documents import SearchClient
-from azure.core.credentials import AzureKeyCredential
-from azure.identity import DefaultAzureCredential
+from dotenv import load_dotenv
+
 from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import ConnectionType
+from azure.ai.agents.models import (
+    ThreadMessage,
+    MessageRole,
+    RunStatus,
+    AzureAISearchTool,
+    AzureAISearchQueryType,
+    ListSortOrder
+)
+from azure.identity import DefaultAzureCredential
 from azure.monitor.opentelemetry import configure_azure_monitor
 from opentelemetry import trace
 from opentelemetry.instrumentation.openai import OpenAIInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
-from openai import AzureOpenAI
-from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
@@ -47,546 +55,364 @@ tracer = trace.get_tracer(__name__)
 
 
 @dataclass
-class RAGResponse:
-    """Response from the RAG agent."""
-    answer: str
-    sources: List[Dict[str, Any]]
+class RAGRequest:
+    """Request structure for RAG queries."""
     query: str
-    retrieval_time: float
-    generation_time: float
-    total_time: float
+    max_documents: Optional[int] = 3
+    search_type: Optional[str] = "hybrid"  # hybrid, semantic, or keyword
 
 
 @dataclass
-class RetrievedDocument:
-    """Document retrieved from search."""
-    docid: str
-    content: str
-    score: float
-    metadata: Dict[str, Any]
+class RAGResponse:
+    """Response from the RAG agent using Agent Service."""
+    answer: str
+    query: str
+    thread_id: str
+    run_id: str
+    total_time: float
+    sources: List[Dict[str, Any]]
 
 
-class RAGAgent:
-    """
-    RAG (Retrieval Augmented Generation) Agent
-
-    This agent implements the RAG pattern by:
-    1. Retrieving relevant documents from Azure AI Search
-    2. Augmenting the user query with retrieved context
-    3. Generating responses using GPT-4 with the enhanced context
-
-    Features:
-    - Hybrid search (keyword + semantic)
-    - Configurable retrieval parameters
-    - Error handling and retry logic
-    - Performance monitoring
-    - Context window management
-    """
+class RAGAgentService:
+    """RAG Agent implementation using Azure AI Agent Service SDK."""
 
     def __init__(
         self,
-        search_service_name: str,
-        search_index_name: str,
-        azure_openai_endpoint: str,
-        azure_openai_api_version: str = "2024-12-01-preview",
+        project_endpoint: Optional[str] = None,
+        search_index_name: Optional[str] = None,
         chat_model: str = "gpt-4.1",
-        embedding_model: str = "text-embedding-3-small",
-        max_context_length: int = 20000,
-        top_k_documents: int = 3
     ):
         """
-        Initialize the RAG agent.
+        Initialize the RAG Agent using Azure AI Agent Service.
 
         Args:
-            search_service_name: Name of Azure AI Search service
+            project_endpoint: Azure AI Foundry project endpoint
             search_index_name: Name of the search index
-            azure_openai_endpoint: Azure OpenAI endpoint (optional, can use env var)
-            azure_openai_api_version: API version for Azure OpenAI
-            chat_model: Name of the chat completion model (e.g., gpt-4, gpt-4o)
-            embedding_model: Name of the embedding model for semantic search
-            max_context_length: Maximum context length for the LLM
-            top_k_documents: Number of documents to retrieve
+            chat_model: Name of the chat completion model
         """
-        self.search_service_name = search_service_name
-        self.search_index_name = search_index_name
+        self.project_endpoint = project_endpoint or os.getenv("PROJECT_ENDPOINT")
+        self.search_index_name = search_index_name or os.getenv("AZURE_SEARCH_INDEX_NAME")
         self.chat_model = chat_model
-        self.embedding_model = embedding_model
-        self.max_context_length = max_context_length
-        self.top_k_documents = top_k_documents
+        
+        # Validate required configuration
+        if not self.project_endpoint:
+            raise ValueError("Azure AI Project endpoint is required (PROJECT_ENDPOINT)")
+        if not self.search_index_name:
+            raise ValueError("Azure Search index name is required (AZURE_SEARCH_INDEX_NAME)")
 
-        # for more details see:
-        # https://learn.microsoft.com/en-us/python/api/overview/azure/ai-projects-readme?view=azure-python-preview
+        # Initialize Azure AI Project client
+        self.credential = DefaultAzureCredential()
         self.project_client = AIProjectClient(
-            credential=DefaultAzureCredential(),
-            endpoint=os.environ["PROJECT_ENDPOINT"],
+            endpoint=self.project_endpoint,
+            credential=self.credential
         )
+        
+        # Initialize monitoring and tracing
+        self._init_monitoring()
+        
+        self.agent = None
+        self._setup_agent()
 
+    def _init_monitoring(self):
+        """Initialize Azure Monitor and auto-instrumentation."""
         connection_string = self.project_client.telemetry.get_connection_string()
-        logger.info(
-            f"Application Insights connection string: {connection_string}")
+        logger.info(f"Application Insights connection string: {connection_string}")
 
         if not connection_string:
             logger.error(
                 "Application Insights is not enabled. Enable by going to Tracing in your Azure AI Foundry project.")
             exit()
 
-        # enable telemetry collection
+        # Enable telemetry collection
         configure_azure_monitor(connection_string=connection_string)
 
         # Initialize auto-instrumentation for OpenAI and requests
-        # This automatically traces all OpenAI API calls and HTTP requests
-        logger.info(
-            "Setting up auto-instrumentation for OpenAI and requests...")
+        logger.info("Setting up auto-instrumentation for OpenAI and requests...")
         OpenAIInstrumentor().instrument()
         RequestsInstrumentor().instrument()
         logger.info("✅ Auto-instrumentation enabled for OpenAI and requests")
 
-        # Initialize search client with proper authentication
-        self._init_search_client()
-
-        # Initialize Azure OpenAI client
-        self._init_openai_client(
-            azure_openai_endpoint, azure_openai_api_version)
-
-        logger.info(
-            f"RAG Agent initialized with chat model: {chat_model}, embedding model: {embedding_model}")
-
-    def _init_search_client(self):
-        """Initialize Azure AI Search client with authentication."""
+    def _setup_agent(self):
+        """Set up the RAG agent with Azure AI Search tool."""
         try:
-            # Try API key first (for development), then managed identity
-            api_key = os.getenv("AZURE_SEARCH_API_KEY")
-            if api_key:
-                credential = AzureKeyCredential(api_key)
-                logger.warning(
-                    "Using API key authentication for Azure Search - consider managed identity for production")
-            else:
-                credential = DefaultAzureCredential()
-                logger.info(
-                    "Using managed identity for Azure Search authentication")
-
-            self.search_client = SearchClient(
-                endpoint=f"https://{self.search_service_name}.search.windows.net",
-                index_name=self.search_index_name,
-                credential=credential
-            )
-
-        except Exception as e:
-            logger.error(f"Failed to initialize search client: {str(e)}")
-            raise
-
-    def _init_openai_client(self, azure_openai_endpoint: Optional[str], api_version: str):
-        """Initialize Azure OpenAI client with authentication."""
-        try:
-            endpoint = azure_openai_endpoint or os.getenv(
-                "AZURE_OPENAI_ENDPOINT")
-            if not endpoint:
-                raise ValueError(
-                    "Azure OpenAI endpoint must be provided via parameter or AZURE_OPENAI_ENDPOINT environment variable")
-
-            # Try API key first (for development), then managed identity
-            api_key = os.getenv("AZURE_OPENAI_API_KEY")
-            if api_key:
-                self.openai_client = AzureOpenAI(
-                    azure_endpoint=endpoint,
-                    api_key=api_key,
-                    api_version=api_version
+            with tracer.start_as_current_span("create_rag_agent_span") as span:
+                span.set_attribute("chat_model", self.chat_model)
+                span.set_attribute("search_index", self.search_index_name)
+                span.set_attribute("project_endpoint", self.project_endpoint)
+                
+                # Get the default Azure AI Search connection
+                search_connection_id = self.project_client.connections.get_default(ConnectionType.AZURE_AI_SEARCH).id
+                logger.info(f"Using Azure AI Search connection: {search_connection_id}")
+                
+                # Create Azure AI Search tool with proper configuration
+                ai_search_tool = AzureAISearchTool(
+                    index_connection_id=search_connection_id,
+                    index_name=self.search_index_name,
+                    query_type=AzureAISearchQueryType.VECTOR_SIMPLE_HYBRID,  # Use hybrid search for best results
+                    top_k=3,  # Default number of documents to retrieve
+                    filter=""  # No filter by default
                 )
-                logger.warning(
-                    "Using API key authentication for Azure OpenAI - consider managed identity for production")
-            else:
-                # Use managed identity
-                credential = DefaultAzureCredential()
-                self.openai_client = AzureOpenAI(
-                    azure_endpoint=endpoint,
-                    azure_ad_token_provider=credential,
-                    api_version=api_version
-                )
-                logger.info(
-                    "Using managed identity for Azure OpenAI authentication")
+                
+                # Define agent instructions for RAG behavior
+                instructions = """You are a helpful AI assistant that answers questions using information from a document collection.
 
-        except Exception as e:
-            logger.error(f"Failed to initialize OpenAI client: {str(e)}")
-            raise
+Your capabilities:
+1. Search for relevant documents using Azure AI Search when users ask questions
+2. Analyze the retrieved content to provide accurate, comprehensive answers
+3. Cite specific sources when referencing information
+4. Clearly indicate when information is not available in the search results
 
-    def _generate_embedding(self, text: str, max_retries: int = 3) -> List[float]:
-        """
-        Generate embedding for text using Azure OpenAI.
-        Auto-instrumentation will automatically trace the OpenAI API call.
+Instructions for answering questions:
+1. Always search for relevant documents first using the Azure AI Search tool
+2. Base your answers primarily on the retrieved document content, don't use your own knowledge
+3. When referencing information, cite the document sources (e.g., "According to document X...")
+4. If the search results don't contain sufficient information, clearly state this limitation
+5. Provide helpful and detailed responses when possible
+6. Express uncertainty when you're not sure about something based on the available documents
 
-        Args:
-            text: Text to generate embedding for
-            max_retries: Maximum retry attempts
+Search parameters to use:
+- Use the configured search index for document retrieval
+- Retrieve multiple relevant documents to provide comprehensive answers
+- Prefer hybrid search for best results combining keyword and semantic matching"""
 
-        Returns:
-            Embedding vector as list of floats
-        """
-        with tracer.start_as_current_span("rag_agent.generate_embedding") as span:
-            span.set_attribute("embedding.model", self.embedding_model)
-            span.set_attribute("embedding.input_length", len(text))
-            span.set_attribute("embedding.max_retries", max_retries)
-
-            for attempt in range(max_retries):
-                try:
-                    # OpenAI call will be automatically traced by auto-instrumentation
-                    response = self.openai_client.embeddings.create(
-                        model=self.embedding_model,
-                        input=text
-                    )
-
-                    embedding = response.data[0].embedding
-                    span.set_attribute(
-                        "embedding.output_dimension", len(embedding))
-                    span.set_attribute("embedding.attempts_used", attempt + 1)
-                    return embedding
-
-                except Exception as e:
-                    wait_time = 2 ** attempt  # Exponential backoff
-                    logger.warning(
-                        f"Embedding generation attempt {attempt + 1} failed: {str(e)}")
-
-                    span.record_exception(e)
-                    span.set_attribute("embedding.error", str(e))
-
-                    if attempt < max_retries - 1:
-                        logger.info(f"Retrying in {wait_time} seconds...")
-                        time.sleep(wait_time)
-                    else:
-                        logger.error(
-                            "All embedding generation attempts failed")
-                        span.set_status(trace.Status(
-                            trace.StatusCode.ERROR, str(e)))
-                        raise
-
-    def retrieve_documents(self, query: str, use_hybrid: bool = True) -> List[RetrievedDocument]:
-        """
-        Retrieve relevant documents from Azure AI Search.
-
-        Args:
-            query: User query
-            use_hybrid: Whether to use hybrid search (keyword + semantic)
-
-        Returns:
-            List of retrieved documents with scores
-        """
-        with tracer.start_as_current_span("rag_agent.retrieve_documents") as span:
-            span.set_attribute("search.query", query)
-            span.set_attribute("search.use_hybrid", use_hybrid)
-            span.set_attribute("search.top_k", self.top_k_documents)
-            span.set_attribute("search.index_name", self.search_index_name)
-
-            start_time = time.time()
-
-            try:
-                if use_hybrid:
-                    # Generate embedding for semantic search
-                    query_embedding = self._generate_embedding(query)
-
-                    # Perform hybrid search (keyword + semantic)
-                    with tracer.start_as_current_span("azure_search.hybrid_search") as search_span:
-                        search_span.set_attribute("search.type", "hybrid")
-                        search_span.set_attribute(
-                            "search.vector_dimension", len(query_embedding))
-
-                        results = self.search_client.search(
-                            search_text=query,
-                            vector_queries=[{
-                                "kind": "vector",
-                                "vector": query_embedding,
-                                "k_nearest_neighbors": self.top_k_documents * 3,  # Get more candidates
-                                "fields": "page_vector"
-                            }],
-                            top=self.top_k_documents,
-                            include_total_count=True
-                        )
-                else:
-                    # Pure keyword search
-                    with tracer.start_as_current_span("azure_search.keyword_search") as search_span:
-                        search_span.set_attribute("search.type", "keyword")
-
-                        results = self.search_client.search(
-                            search_text=query,
-                            top=self.top_k_documents,
-                            include_total_count=True
-                        )
-
-                # Process results
-                retrieved_docs = []
-                for result in results:
-                    doc = RetrievedDocument(
-                        docid=result.get("docid", ""),
-                        content=result.get("page", ""),
-                        score=result.get("@search.score", 0.0),
-                        metadata={"source_type": "azure_search"}
-                    )
-                    retrieved_docs.append(doc)
-
-                retrieval_time = time.time() - start_time
-                search_type = "hybrid" if use_hybrid else "keyword"
-
-                # Add telemetry attributes
-                span.set_attribute(
-                    "search.documents_retrieved", len(retrieved_docs))
-                span.set_attribute("search.retrieval_time", retrieval_time)
-                span.set_attribute("search.type_used", search_type)
-
-                logger.info(
-                    f"Retrieved {len(retrieved_docs)} documents using {search_type} search in {retrieval_time:.3f}s")
-
-                return retrieved_docs
-
-            except Exception as e:
-                logger.error(f"Document retrieval failed: {str(e)}")
-                span.record_exception(e)
-                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                return []
-
-    def _prepare_context(self, documents: List[RetrievedDocument]) -> str:
-        """
-        Prepare context string from retrieved documents.
-
-        Args:
-            documents: List of retrieved documents
-
-        Returns:
-            Formatted context string
-        """
-        if not documents:
-            return "No relevant documents found."
-
-        context_parts = []
-        current_length = 0
-
-        for i, doc in enumerate(documents, 1):
-            # Format document with source information
-            doc_text = f"Document {i} (ID: {doc.docid}, Score: {doc.score:.3f}):\n{doc.content}\n"
-
-            # Check if adding this document would exceed context limit
-            if current_length + len(doc_text) > self.max_context_length:
-                logger.warning(
-                    f"Context limit reached, truncating at {i-1} documents")
-                break
-
-            context_parts.append(doc_text)
-            current_length += len(doc_text)
-
-        return "\n".join(context_parts)
-
-    def _create_prompt(self, query: str, context: str) -> str:
-        """
-        Create prompt for the LLM with retrieved context.
-
-        Args:
-            query: User query
-            context: Retrieved document context
-
-        Returns:
-            Formatted prompt string
-        """
-        prompt = f"""Context from retrieved documents:
-{context}
-
-User Question: {query}"""
-        return prompt
-
-    def generate_response(
-        self,
-        query: str,
-        context: str,
-        max_tokens: int = 1000,
-        temperature: float = 0.1
-    ) -> Tuple[str, float]:
-        """
-        Generate response using GPT-4 with retrieved context.
-        Auto-instrumentation will automatically trace the OpenAI API call.
-
-        Args:
-            query: User query
-            context: Retrieved document context
-            max_tokens: Maximum tokens in response
-            temperature: Sampling temperature
-
-        Returns:
-            Tuple of (response_text, generation_time)
-        """
-        with tracer.start_as_current_span("rag_agent.generate_response") as span:
-            span.set_attribute("generation.model", self.chat_model)
-            span.set_attribute("generation.max_tokens", max_tokens)
-            span.set_attribute("generation.temperature", temperature)
-            span.set_attribute("generation.query_length", len(query))
-            span.set_attribute("generation.context_length", len(context))
-
-            start_time = time.time()
-
-            try:
-                prompt = self._create_prompt(query, context)
-                span.set_attribute("generation.prompt_length", len(prompt))
-
-                # OpenAI call will be automatically traced by auto-instrumentation
-                response = self.openai_client.chat.completions.create(
+                # Create the RAG agent with Azure AI Search tool
+                self.agent = self.project_client.agents.create_agent(
                     model=self.chat_model,
-                    messages=[
-                        {"role": "system", "content": """You are an AI assistant helping users find information from a document collection. 
-Use the provided context to answer the user's question accurately and comprehensively.
-
-Instructions:
-1. Base your answer primarily on the provided context
-2. If the context doesn't contain enough information, clearly state this limitation
-3. Cite specific documents when referencing information (e.g., "According to Document 1...")
-4. Provide a helpful and detailed response
-5. If you're unsure about something, express that uncertainty"""},
-                        {"role": "user", "content": prompt}
-                    ],
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    top_p=0.9
+                    name="RAGAgent001",
+                    description="AI agent for retrieval-augmented generation using Azure AI Search",
+                    instructions=instructions,
+                    tools=ai_search_tool.definitions,
+                    tool_resources=ai_search_tool.resources
                 )
+                
+                logger.info(f"RAG Agent created with ID: {self.agent.id}")
+                span.set_attribute("agent_id", self.agent.id)
+                span.set_attribute("search_connection_id", search_connection_id)
 
-                answer = response.choices[0].message.content
-                generation_time = time.time() - start_time
+        except Exception as e:
+            logger.error(f"Failed to setup RAG agent: {e}")
+            logger.error(f"Full exception trace:\n{traceback.format_exc()}")
+            raise
 
-                # Add telemetry attributes for our custom metrics
-                span.set_attribute("generation.response_length", len(answer))
-                span.set_attribute("generation.time", generation_time)
-                if response.usage:
-                    span.set_attribute(
-                        "generation.completion_tokens", response.usage.completion_tokens)
-                    span.set_attribute(
-                        "generation.prompt_tokens", response.usage.prompt_tokens)
-                    span.set_attribute(
-                        "generation.total_tokens", response.usage.total_tokens)
-
-                logger.info(
-                    f"Generated response in {generation_time:.3f}s using {self.chat_model}")
-                return answer, generation_time
-
-            except Exception as e:
-                logger.error(f"Response generation failed: {str(e)}")
-                span.record_exception(e)
-                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                return f"I apologize, but I encountered an error while generating a response: {str(e)}", 0.0
-
-    def ask(self, query: str, use_hybrid_search: bool = True) -> RAGResponse:
+    def ask(self, query: str, max_documents: int = 3) -> RAGResponse:
         """
-        Main method to ask a question using the RAG pipeline.
+        Ask a question using the RAG agent service.
 
         Args:
             query: User question
-            use_hybrid_search: Whether to use hybrid search
+            max_documents: Maximum number of documents to retrieve
 
         Returns:
-            RAGResponse with answer, sources, and timing information
+            RAGResponse with answer and metadata
         """
-        with tracer.start_as_current_span("rag_agent.ask") as span:
-            span.set_attribute("rag.query", query)
-            span.set_attribute("rag.use_hybrid_search", use_hybrid_search)
-            span.set_attribute("rag.top_k_documents", self.top_k_documents)
-            span.set_attribute("rag.chat_model", self.chat_model)
-            span.set_attribute("rag.embedding_model", self.embedding_model)
-
-            start_time = time.time()
-
+        try:
             logger.info(f"Processing query: '{query}'")
+            
+            with tracer.start_as_current_span("rag_agent_service.ask") as main_span:
+                main_span.set_attribute("rag.query", query)
+                main_span.set_attribute("rag.max_documents", max_documents)
+                main_span.set_attribute("rag.chat_model", self.chat_model)
+                main_span.set_attribute("rag.search_index", self.search_index_name)
+                
+                start_time = time.time()
+                
+                with tracer.start_as_current_span("thread_creation_span") as thread_span:
+                    # Create a thread for this conversation
+                    thread = self.project_client.agents.threads.create()
+                    thread_span.set_attribute("thread_id", thread.id)
+                    logger.info(f"Created thread: {thread.id}")
 
-            try:
-                # Step 1: Retrieve relevant documents
-                retrieval_start = time.time()
-                documents = self.retrieve_documents(
-                    query, use_hybrid=use_hybrid_search)
-                retrieval_time = time.time() - retrieval_start
+                with tracer.start_as_current_span("rag_query_span") as query_span:
+                
+                    # Send the message to the agent
+                    message = self.project_client.agents.messages.create(
+                        thread_id=thread.id,
+                        role=MessageRole.USER,
+                        content=query
+                    )
+                    query_span.set_attribute("user_message", query)
+                    
+                    # Run the agent
+                    run = self.project_client.agents.runs.create_and_process(
+                        thread_id=thread.id,
+                        agent_id=self.agent.id
+                    )
+                    query_span.set_attribute("agent_id", self.agent.id)
+                    query_span.set_attribute("run_id", run.id)
+                    
+                    # Wait for completion
+                    completed_run = self._wait_for_run_completion(thread.id, run.id)
+                    
+                    total_time = time.time() - start_time
+                    
+                    if completed_run.status == RunStatus.COMPLETED:
+                        query_span.set_attribute("run_status", "COMPLETED")
+                        
+                        # Set tool call attributes for observability
+                        self._set_tool_call_attributes(query_span, thread.id, run.id)
+                        
+                        # Retrieve the agent's response
+                        messages = self.project_client.agents.messages.list(thread_id=thread.id)
+                        
+                        # Process the response
+                        answer, sources = self._process_agent_response(messages)
+                        
+                        query_span.set_attribute("answer_length", len(answer))
+                        query_span.set_attribute("sources_count", len(sources))
+                        
+                        logger.info(f"RAG query completed in {total_time:.3f}s")
+                        
+                        return RAGResponse(
+                            answer=answer,
+                            query=query,
+                            thread_id=thread.id,
+                            run_id=run.id,
+                            total_time=total_time,
+                            sources=sources
+                        )
+                    else:
+                        query_span.set_attribute("run_status", "FAILED")
+                        error_msg = f"Agent run failed with status: {completed_run.status}"
+                        if hasattr(completed_run, 'last_error') and completed_run.last_error:
+                            error_msg += f"\nLast error: {completed_run.last_error}"
+                        logger.error(error_msg)
+                        raise RuntimeError(error_msg)
 
-                # Step 2: Prepare context from retrieved documents
-                context = self._prepare_context(documents)
-                span.set_attribute("rag.context_length", len(context))
+        except Exception as e:
+            logger.error(f"Error during RAG query: {e}")
+            logger.error(f"Full exception trace:\n{traceback.format_exc()}")
+            raise
 
-                # Step 3: Generate response using LLM
-                answer, generation_time = self.generate_response(
-                    query, context)
+    def _wait_for_run_completion(self, thread_id: str, run_id: str, timeout: int = 300) -> Any:
+        """
+        Wait for the agent run to complete.
 
-                # Prepare sources information
-                sources = []
-                for doc in documents:
+        Args:
+            thread_id: Thread identifier
+            run_id: Run identifier
+            timeout: Maximum wait time in seconds
+
+        Returns:
+            Completed run object
+        """
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            run = self.project_client.agents.runs.get(thread_id=thread_id, run_id=run_id)
+
+            if run.status in [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED]:
+                return run
+
+            logger.info(f"Run status: {run.status}. Waiting...")
+            time.sleep(5)
+
+        raise TimeoutError(f"Run did not complete within {timeout} seconds")
+
+    def _set_tool_call_attributes(self, span, thread_id: str, run_id: str):
+        """Set OpenTelemetry attributes with tool call information."""
+        try:
+            run_steps = self.project_client.agents.run_steps.list(thread_id=thread_id, run_id=run_id)
+            tool_call_count = 0
+            
+            for step in run_steps:
+                step_details = step.step_details if hasattr(step, 'step_details') else {}
+                tool_calls = step_details.tool_calls if hasattr(step_details, 'tool_calls') else []
+                
+                for call in tool_calls:
+                    tool_call_count += 1
+                    span.set_attribute(f"tool_call_{tool_call_count}.type", getattr(call, 'type', 'unknown'))
+                    span.set_attribute(f"tool_call_{tool_call_count}.id", getattr(call, 'id', 'unknown'))
+                    
+                    if hasattr(call, 'azure_ai_search'):
+                        azure_search = call.azure_ai_search
+                        if hasattr(azure_search, 'input'):
+                            span.set_attribute(f"tool_call_{tool_call_count}.search_input", str(azure_search.input))
+                        if hasattr(azure_search, 'output'):
+                            span.set_attribute(f"tool_call_{tool_call_count}.search_output", str(azure_search.output))
+            
+            span.set_attribute("tool_calls_total", tool_call_count)
+            
+        except Exception as e:
+            span.set_attribute("tool_calls_error", str(e))
+
+    def _process_agent_response(self, messages: List[ThreadMessage]) -> tuple[str, List[Dict[str, Any]]]:
+        """
+        Process the agent's response to extract answer and sources.
+
+        Args:
+            messages: Thread messages from the agent
+
+        Returns:
+            Tuple of (answer_text, sources_list)
+        """
+        try:
+            # Get the latest assistant message
+            assistant_messages = [
+                msg for msg in messages if msg.role == MessageRole.AGENT
+            ]
+            
+            if not assistant_messages:
+                raise ValueError("No assistant response found")
+
+            latest_response = assistant_messages[-1]
+            
+            # Extract text content and handle citations
+            answer = ""
+            sources = []
+            
+            if hasattr(latest_response, 'content') and latest_response.content:
+                for content_item in latest_response.content:
+                    if hasattr(content_item, 'text') and hasattr(content_item.text, 'value'):
+                        answer += content_item.text.value
+            
+            # Process URL citations if available (following the example pattern)
+            if hasattr(latest_response, 'url_citation_annotations') and latest_response.url_citation_annotations:
+                placeholder_annotations = {
+                    annotation.text: f" [see {annotation.url_citation.title}] ({annotation.url_citation.url})"
+                    for annotation in latest_response.url_citation_annotations
+                }
+                
+                # Replace citation placeholders in the answer
+                for placeholder, citation in placeholder_annotations.items():
+                    answer = answer.replace(placeholder, citation)
+                
+                # Extract source information
+                for annotation in latest_response.url_citation_annotations:
                     sources.append({
-                        "docid": doc.docid,
-                        "content_preview": doc.content[:200] + "..." if len(doc.content) > 200 else doc.content,
-                        "score": doc.score,
-                        "metadata": doc.metadata
+                        "title": annotation.url_citation.title,
+                        "url": annotation.url_citation.url,
+                        "placeholder": annotation.text
                     })
+            
+            return answer, sources
 
-                total_time = time.time() - start_time
+        except Exception as e:
+            logger.error(f"Error processing agent response: {e}")
+            raise
 
-                # Add final telemetry attributes
-                span.set_attribute("rag.documents_used", len(documents))
-                span.set_attribute("rag.retrieval_time", retrieval_time)
-                span.set_attribute("rag.generation_time", generation_time)
-                span.set_attribute("rag.total_time", total_time)
-                span.set_attribute("rag.answer_length", len(answer))
-
-                logger.info(
-                    f"RAG pipeline completed in {total_time:.3f}s (retrieval: {retrieval_time:.3f}s, generation: {generation_time:.3f}s)")
-
-                return RAGResponse(
-                    answer=answer,
-                    sources=sources,
-                    query=query,
-                    retrieval_time=retrieval_time,
-                    generation_time=generation_time,
-                    total_time=total_time
-                )
-
-            except Exception as e:
-                logger.error(f"RAG pipeline failed: {str(e)}")
-                span.record_exception(e)
-                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                return RAGResponse(
-                    answer=f"I apologize, but I encountered an error while processing your question: {str(e)}",
-                    sources=[],
-                    query=query,
-                    retrieval_time=0.0,
-                    generation_time=0.0,
-                    total_time=time.time() - start_time
-                )
+    def cleanup(self):
+        """Clean up resources."""
+        try:
+            if self.agent:
+                self.project_client.agents.delete_agent(self.agent.id)
+                logger.info("RAG Agent cleaned up successfully")
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
 
 
 def main():
     """
-    Demo function to test the RAG agent.
+    Demo function to test the RAG Agent Service.
     """
-    # Configuration from environment variables
-    search_service_name = os.getenv(
-        "AZURE_SEARCH_SERVICE_NAME", "your-search-service")
-    search_index_name = os.getenv(
-        "AZURE_SEARCH_INDEX_NAME", "ai-foundry-workshop-index-v1")
-    azure_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-    chat_model = os.getenv("AZURE_OPENAI_CHAT_MODEL", "gpt-4.1")
-
-    # Validate configuration
-    if search_service_name == "your-search-service":
-        print("❌ Error: Please set AZURE_SEARCH_SERVICE_NAME environment variable")
-        return
-
-    if not azure_openai_endpoint:
-        print("❌ Error: Please set AZURE_OPENAI_ENDPOINT environment variable")
-        return
-
     try:
-        # Initialize RAG agent
-        print("🤖 Initializing RAG Agent...")
-        agent = RAGAgent(
-            search_service_name=search_service_name,
-            search_index_name=search_index_name,
-            azure_openai_endpoint=azure_openai_endpoint,
-            chat_model=chat_model,
-            top_k_documents=3
-        )
-        print(f"✅ RAG Agent initialized with model: {chat_model}")
+        # Initialize the RAG agent
+        print("🤖 Initializing RAG Agent Service...")
+        agent = RAGAgentService()
+        print(f"✅ RAG Agent Service initialized")
 
         # Test queries
         test_queries = [
-            "What are the key capabilities of Azure AI services?",
-            "How does GPT-4 perform compared to previous models?",
-            "What are the features of Document Intelligence?",
-            "Explain the architecture of modern language models"
+            "What's Document Intelligence layout model?",
+            "What's Document Intelligence read model and what is diffrence between it and layout model?",
         ]
 
         for query in test_queries:
@@ -594,29 +420,31 @@ def main():
             print(f"🔍 Query: {query}")
             print("="*80)
 
-            # Get response from RAG agent
-            response = agent.ask(query)
+            # Get response from RAG agent service
+            response = agent.ask(query, max_documents=3)
 
             # Display results
             print(f"\n📝 Answer:")
             print(response.answer)
 
             print(f"\n📊 Performance:")
-            print(f"   • Retrieval: {response.retrieval_time:.3f}s")
-            print(f"   • Generation: {response.generation_time:.3f}s")
-            print(f"   • Total: {response.total_time:.3f}s")
+            print(f"   • Total time: {response.total_time:.3f}s")
+            print(f"   • Thread ID: {response.thread_id}")
+            print(f"   • Run ID: {response.run_id}")
 
-            print(f"\n📚 Sources ({len(response.sources)} documents):")
-            for i, source in enumerate(response.sources, 1):
-                print(
-                    f"   {i}. {source['docid']} (score: {source['score']:.3f})")
-                print(f"      Preview: {source['content_preview']}")
+            if response.sources:
+                print(f"\n📚 Sources ({len(response.sources)} documents):")
+                for i, source in enumerate(response.sources, 1):
+                    print(f"   {i}. {source}")
 
-        print(f"\n🎉 RAG Agent demo completed!")
+        print(f"\n🎉 RAG Agent Service demo completed!")
 
     except Exception as e:
         logger.error(f"Demo failed: {str(e)}")
         print(f"❌ Error: {str(e)}")
+    finally:
+        if 'agent' in locals():
+            agent.cleanup()
 
 
 if __name__ == "__main__":

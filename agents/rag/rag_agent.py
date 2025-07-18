@@ -148,32 +148,28 @@ class RAGAgentService:
                 ai_search_tool = AzureAISearchTool(
                     index_connection_id=search_connection_id,
                     index_name=self.search_index_name,
-                    query_type=AzureAISearchQueryType.VECTOR_SIMPLE_HYBRID,  # Use hybrid search for best results
+                    query_type=AzureAISearchQueryType.SIMPLE, # .VECTOR_SIMPLE_HYBRID,  # Use hybrid search for best results
                     top_k=3,  # Default number of documents to retrieve
                     filter=""  # No filter by default
                 )
                 
                 # Define agent instructions for RAG behavior
-                instructions = """You are a helpful AI assistant that answers questions using information from a document collection.
+                instructions = """You are a helpful AI assistant that answers questions about Azure AI services.
 
 Your capabilities:
-1. Search for relevant documents using Azure AI Search when users ask questions
+1. Search for relevant information using Azure AI Search tool when users ask questions
 2. Analyze the retrieved content to provide accurate, comprehensive answers
 3. Cite specific sources when referencing information
 4. Clearly indicate when information is not available in the search results
 
 Instructions for answering questions:
-1. Always search for relevant documents first using the Azure AI Search tool
+1. Always search for relevant documents using the Azure AI Search tool
 2. Base your answers primarily on the retrieved document content, don't use your own knowledge
 3. When referencing information, cite the document sources (e.g., "According to document X...")
 4. If the search results don't contain sufficient information, clearly state this limitation
 5. Provide helpful and detailed responses when possible
 6. Express uncertainty when you're not sure about something based on the available documents
-
-Search parameters to use:
-- Use the configured search index for document retrieval
-- Retrieve multiple relevant documents to provide comprehensive answers
-- Prefer hybrid search for best results combining keyword and semantic matching"""
+"""
 
                 # Create the RAG agent with Azure AI Search tool
                 self.agent = self.project_client.agents.create_agent(
@@ -257,8 +253,8 @@ Search parameters to use:
                         # Process the response
                         answer, sources = self._process_agent_response(messages)
                         
-                        query_span.set_attribute("answer_length", len(answer))
-                        query_span.set_attribute("sources_count", len(sources))
+                        query_span.set_attribute("answer", answer)
+                        query_span.set_attribute("sources", sources)
                         
                         logger.info(f"RAG query completed in {total_time:.3f}s")
                         

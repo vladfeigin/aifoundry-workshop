@@ -48,7 +48,7 @@ from azure.ai.projects import AIProjectClient
 from dotenv import load_dotenv
 
 # Import our RAG agent
-from agents.rag.rag_agent import RAGAgent, RAGResponse
+from agents.rag.rag_agent import RAGAgentService, RAGResponse
 
 # Load environment variables
 load_dotenv()
@@ -93,7 +93,7 @@ class RAGAgentEvaluator:
     
     def __init__(
         self,
-        rag_agent: RAGAgent,
+        rag_agent: RAGAgentService,
         project_client: AIProjectClient,
         model_config: Optional[Dict[str, str]] = None
     ):
@@ -108,12 +108,25 @@ class RAGAgentEvaluator:
         self.rag_agent = rag_agent
         self.project_client = project_client
         
-        # Default model configuration for evaluations
+        # Get model configuration from environment or defaults
+        azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+        api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+        deployment_name = model_config.get("model") if model_config else os.environ.get("EVALUATION_MODEL", "gpt-4o")
+        api_version = model_config.get("api_version") if model_config else "2024-12-01-preview"
+        
+        if not azure_endpoint:
+            raise ValueError("AZURE_OPENAI_ENDPOINT environment variable is required")
+        if not api_key:
+            raise ValueError("AZURE_OPENAI_API_KEY environment variable is required")
+        if not deployment_name:
+            raise ValueError("AZURE_EVALUATION_MODEL environment variable or model_config is required")
+        
+        # Create model configuration for evaluations
         self.model_config = AzureOpenAIModelConfiguration(
-            azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT"),
-            api_key=os.environ.get("AZURE_OPENAI_API_KEY"),
-            azure_deployment=model_config.get("model") if model_config else "gpt-4.1",
-            api_version=model_config.get("api_version") if model_config else "2024-12-01-preview"
+            azure_endpoint=azure_endpoint,
+            api_key=api_key,
+            azure_deployment=deployment_name,
+            api_version=api_version
         )
         
         # Initialize evaluators
@@ -507,6 +520,17 @@ def main():
     try:
         logger.info("🚀 Starting RAG Agent Evaluation")
         
+        # Check required environment variables
+        required_vars = ["PROJECT_ENDPOINT", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY"]
+        missing_vars = [var for var in required_vars if not os.environ.get(var)]
+        
+        if missing_vars:
+            logger.error("Missing required environment variables: %s", ", ".join(missing_vars))
+            logger.error("Please set these environment variables in your .env file:")
+            for var in missing_vars:
+                logger.error("  %s=your_value_here", var)
+            raise ValueError(f"Missing required environment variables: {missing_vars}")
+        
         # Initialize Azure AI Project Client
         logger.info("Initializing Azure AI Project Client...")
         project_client = AIProjectClient(
@@ -516,19 +540,13 @@ def main():
         
         # Initialize RAG Agent
         logger.info("Initializing RAG Agent...")
-        rag_agent = RAGAgent(
-            search_service_name=os.environ["AZURE_SEARCH_SERVICE_NAME"],
-            search_index_name=os.environ["AZURE_SEARCH_INDEX_NAME"],
-            azure_openai_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT"),
-            chat_model=os.environ.get("AZURE_OPENAI_CHAT_MODEL", "gpt-4.1"),
-            top_k_documents=3
-        )
+        rag_agent = RAGAgentService()
         
         # Initialize evaluator
         evaluator = RAGAgentEvaluator(
             rag_agent=rag_agent,
             project_client=project_client,
-            model_config={"model": "gpt-4.1", "api_version": "2024-12-01-preview"}
+            model_config={"model": "gpt-4o", "api_version": "2024-12-01-preview"}
         )
         
         # Define paths

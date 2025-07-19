@@ -1,24 +1,38 @@
 # RAG Agent Evaluation Module
 
-This module provides comprehensive evaluation capabilities for RAG (Retrieval Augmented Generation) agents using Azure AI Evaluation SDK. It implements multiple evaluation metrics and automated testing workflows to assess RAG agent performance across various dimensions.
+This module provides comprehensive evaluation capabilities for RAG (Retrieval Augmented Generation) agents with support for both local and cloud-based evaluation workflows. It implements multiple evaluation metrics and automated testing workflows to assess RAG agent performance across various dimensions.
 
 ## 🚀 Quick Start
 
+### Local Evaluation
 1. **Set up environment variables** (see Environment Setup below)
-2. **Run evaluation**: `python run_evaluation.py`
+2. **Run local evaluation**: `python -m agents.evaluations.rag.rag_agent_eval`
 3. **Check results** in `../data/output/` directory
+
+### Cloud Evaluation
+1. **Set up environment variables** (see Environment Setup below)
+2. **Run cloud evaluation**: `python -m agents.evaluations.rag.rag_agent_eval_azure`
+3. **Monitor results** in Azure AI Foundry portal
 
 ## 🏗️ Architecture
 
-The evaluation module consists of several key components:
+The evaluation module consists of two main evaluation workflows:
 
-- **RAGAgentEvaluator**: Main evaluation orchestrator
-- **Built-in Evaluators**: Azure AI Evaluation SDK metrics (Groundedness, Relevance)
-- **Custom Evaluators**: Response Completeness and Intent Resolution
-- **Dataset Processing**: JSONL dataset loading and agent response generation
-- **Result Analysis**: Comprehensive reporting and analytics
+### Local Evaluation (`rag_agent_eval.py`)
+- **RAGAgentEvaluator**: Main evaluation orchestrator running locally
+- **Azure AI Evaluation SDK**: Direct local evaluation using Azure AI evaluators
+- **Immediate Results**: Get evaluation results immediately in local environment
+- **Best for**: Development, debugging, and quick iterations
+
+### Cloud Evaluation (`rag_agent_eval_azure.py`)
+- **RAGAgentCloudEvaluator**: Cloud-based evaluation orchestrator
+- **Azure AI Foundry**: Scalable cloud evaluation platform
+- **Distributed Processing**: Leverage cloud compute for large-scale evaluation
+- **Best for**: Production, CI/CD pipelines, and large datasets
 
 ## 📊 Evaluation Metrics
+
+Both local and cloud evaluation workflows support the same comprehensive set of metrics:
 
 ### 1. Groundedness
 **Purpose**: Measures if the response is supported by the retrieved context
@@ -32,16 +46,16 @@ The evaluation module consists of several key components:
 - **Implementation**: Azure AI Evaluation SDK RelevanceEvaluator
 - **Focus**: Query-response relevance and appropriateness
 
-### 3. Response Completeness (Custom)
+### 3. Response Completeness
 **Purpose**: Assesses if the response fully addresses all aspects of the query
 - **Scale**: 0.0 - 1.0 (higher is better)
-- **Implementation**: Custom GPT-4 powered evaluator
+- **Implementation**: Azure AI Evaluation SDK CompletenessEvaluator
 - **Focus**: Comprehensiveness and thoroughness
 
-### 4. Intent Resolution (Custom)
+### 4. Intent Resolution
 **Purpose**: Determines if the response successfully resolves the user's underlying intent
 - **Scale**: 0.0 - 1.0 (higher is better)
-- **Implementation**: Custom GPT-4 powered evaluator
+- **Implementation**: Azure AI Evaluation SDK IntentResolutionEvaluator
 - **Focus**: User satisfaction and information need fulfillment
 
 ## 🗂️ Dataset Format
@@ -70,10 +84,12 @@ The evaluation dataset uses JSONL format with the following schema:
 export AZURE_SUBSCRIPTION_ID="your-subscription-id"
 export AZURE_RESOURCE_GROUP="your-resource-group"
 export AZURE_PROJECT_NAME="your-project-name"
-export AZURE_PROJECT_ENDPOINT="your-project-endpoint"
+export PROJECT_ENDPOINT="your-project-endpoint"
 export AZURE_SEARCH_SERVICE_NAME="your-search-service"
 export AZURE_SEARCH_INDEX_NAME="your-search-index"
 export AZURE_OPENAI_ENDPOINT="your-openai-endpoint"
+export AZURE_OPENAI_API_KEY="your-openai-api-key"
+export AZURE_EVALUATION_MODEL="gpt-4o"
 ```
 
 2. **Dependencies**: Ensure all packages are installed
@@ -81,13 +97,57 @@ export AZURE_OPENAI_ENDPOINT="your-openai-endpoint"
 uv sync  # or pip install -r requirements.txt
 ```
 
-### Basic Usage
+### Local Evaluation Workflow
+
+**Best for**: Development, debugging, and quick iterations
 
 ```bash
-# Run evaluation with default settings
-cd agents/evaluations/rag
-python run_evaluation.py
+# Run local evaluation
+cd /path/to/your/project
+python -m agents.evaluations.rag.rag_agent_eval
+
+# Results will be saved to:
+# - agents/evaluations/data/output/single-turn-eval-ds-agent-output.jsonl
+# - agents/evaluations/data/output/evaluation_results.json
 ```
+
+**Features**:
+- ✅ Immediate local results
+- ✅ Detailed debugging information
+- ✅ Full control over evaluation process
+- ✅ Works offline after initial setup
+
+### Cloud Evaluation Workflow
+
+**Best for**: Production, CI/CD pipelines, and large datasets
+
+```bash
+# Run cloud evaluation
+cd /path/to/your/project
+python -m agents.evaluations.rag.rag_agent_eval_azure
+
+# Results will be available in:
+# - Azure AI Foundry portal
+# - agents/evaluations/data/output/cloud-evaluation-dataset.jsonl
+```
+
+**Features**:
+- ✅ Scalable cloud compute
+- ✅ Integrated with Azure AI Foundry
+- ✅ Automatic result logging
+- ✅ Perfect for CI/CD pipelines
+- ✅ No local compute constraints
+
+### Choosing Between Local and Cloud
+
+| Criteria | Local Evaluation | Cloud Evaluation |
+|----------|------------------|------------------|
+| **Speed** | Fast for small datasets | Scales with dataset size |
+| **Setup** | Simple, minimal dependencies | Requires Azure AI Foundry setup |
+| **Cost** | Only API calls | API calls + cloud compute |
+| **Debugging** | Full local control | Limited debugging capabilities |
+| **CI/CD** | Basic CI/CD support | Optimized for CI/CD pipelines |
+| **Scalability** | Limited by local resources | Unlimited cloud scalability |
 
 ### Environment Setup
 
@@ -105,60 +165,102 @@ export AZURE_OPENAI_ENDPOINT="your-openai-endpoint"
 
 ### Programmatic Usage
 
+#### Local Evaluation
 ```python
-import asyncio
-from rag_agent_eval import RAGAgentEvaluator
-from agents.rag.rag_agent import RAGAgent
+from agents.evaluations.rag.rag_agent_eval import RAGAgentEvaluator
+from agents.rag.rag_agent import RAGAgentService
+from azure.ai.projects import AIProjectClient
+from azure.identity import DefaultAzureCredential
 
 # Initialize components
-rag_agent = RAGAgent(...)
+project_client = AIProjectClient(
+    endpoint=os.environ["PROJECT_ENDPOINT"],
+    credential=DefaultAzureCredential()
+)
+rag_agent = RAGAgentService()
 evaluator = RAGAgentEvaluator(rag_agent, project_client)
 
 # Load and process dataset
 dataset = evaluator.load_evaluation_dataset("eval-ds.jsonl")
 dataset_with_responses = evaluator.single_turn_agent_run(dataset)
 
-# Run evaluation
-results = await evaluator.evaluate_dataset(dataset_with_responses)
+# Run evaluation locally
+results = evaluator.evaluate_dataset(dataset_with_responses)
 evaluator.print_evaluation_summary(results)
+```
+
+#### Cloud Evaluation
+```python
+from agents.evaluations.rag.rag_agent_eval_azure import RAGAgentCloudEvaluator
+from agents.rag.rag_agent import RAGAgentService
+from azure.ai.projects import AIProjectClient
+from azure.identity import DefaultAzureCredential
+
+# Initialize components
+project_client = AIProjectClient(
+    endpoint=os.environ["PROJECT_ENDPOINT"],
+    credential=DefaultAzureCredential()
+)
+rag_agent = RAGAgentService()
+evaluator = RAGAgentCloudEvaluator(rag_agent, project_client)
+
+# Load and process dataset
+dataset = evaluator.load_evaluation_dataset("eval-ds.jsonl")
+dataset_with_responses = evaluator.generate_agent_responses(dataset)
+
+# Prepare and upload dataset for cloud evaluation
+prepared_path = evaluator.prepare_evaluation_dataset(dataset_with_responses, "cloud-eval.jsonl")
+data_id = evaluator.upload_dataset(prepared_path)
+
+# Configure and run cloud evaluation
+evaluators = evaluator.configure_evaluators()
+evaluation_name = evaluator.run_cloud_evaluation(data_id, evaluators)
+
+# Monitor and retrieve results
+status = evaluator.monitor_evaluation_status(evaluation_name)
+if status["status"] == "Completed":
+    results = evaluator.get_evaluation_results(evaluation_name)
+    evaluator.print_evaluation_summary(results)
 ```
 
 ## 📁 File Structure
 
 ```
 agents/evaluations/rag/
-├── rag_agent_eval.py          # Main evaluation module with RAGAgentEvaluator class
-├── run_evaluation.py          # Simple CLI interface to run evaluations
-├── README.md                  # This documentation
-└── __init__.py                # Package init (optional)
+├── rag_agent_eval.py              # Local evaluation module with RAGAgentEvaluator class
+├── rag_agent_eval_azure.py        # Cloud evaluation module with RAGAgentCloudEvaluator class
+├── README.md                      # This documentation
+└── __init__.py                    # Package init
 ```
 
 ```
 agents/evaluations/data/
-├── single-turn-eval-ds.jsonl              # Evaluation dataset
+├── single-turn-eval-ds.jsonl                    # Evaluation dataset
 └── output/
-    ├── single-turn-eval-ds-agent-output.jsonl  # Agent responses
-    └── evaluation_results.json                 # Evaluation results
+    ├── single-turn-eval-ds-agent-output.jsonl   # Agent responses (local evaluation)
+    ├── evaluation_results.json                  # Evaluation results (local evaluation)
+    └── cloud-evaluation-dataset.jsonl           # Prepared dataset for cloud evaluation
 ```
 
 ## 🔧 Configuration
 
-### Model Configuration
+### Local Evaluation Configuration
 ```python
-model_config = {
-    "model": "gpt-4",
-    "api_version": "2024-12-01-preview"
-}
+# In rag_agent_eval.py
+evaluator = RAGAgentEvaluator(
+    rag_agent=rag_agent,
+    project_client=project_client,
+    model_config={"model": "gpt-4o", "api_version": "2024-12-01-preview"}
+)
 ```
 
-### RAG Agent Configuration
+### Cloud Evaluation Configuration
 ```python
-rag_agent = RAGAgent(
-    search_service_name="your-search-service",
-    search_index_name="your-index",
-    azure_openai_endpoint="your-endpoint",
-    chat_model="gpt-4",
-    top_k_documents=3
+# In rag_agent_eval_azure.py
+evaluator = RAGAgentCloudEvaluator(
+    rag_agent=rag_agent,
+    project_client=project_client,
+    model_config={"model": "gpt-4o", "api_version": "2024-12-01-preview"}
 )
 ```
 
@@ -198,6 +300,40 @@ rag_agent = RAGAgent(
 }
 ```
 
+## ☁️ Cloud Evaluation Features
+
+### Azure AI Foundry Integration
+- **Automatic Dataset Upload**: Upload evaluation datasets to Azure AI Foundry
+- **Centralized Evaluation**: Run evaluations on Azure cloud infrastructure
+- **Result Tracking**: Automatic logging and tracking of evaluation results
+- **Scalable Compute**: Handle large datasets without local resource constraints
+
+### Monitoring and Status Tracking
+```python
+# Monitor evaluation progress
+status_result = evaluator.monitor_evaluation_status(evaluation_name, timeout=1800)
+
+# Check evaluation status
+if status_result["status"] == "Completed":
+    results = evaluator.get_evaluation_results(evaluation_name)
+    evaluator.print_evaluation_summary(results)
+```
+
+### Cloud Evaluation Benefits
+- **Scalability**: Handle datasets of any size
+- **Consistency**: Reproducible evaluation environment
+- **Integration**: Seamless integration with Azure AI Foundry
+- **Automation**: Perfect for automated CI/CD pipelines
+- **Centralized Results**: All results stored in Azure AI Foundry portal
+
+### When to Use Cloud Evaluation
+- ✅ Large datasets (>100 queries)
+- ✅ Production evaluation pipelines
+- ✅ CI/CD integration requirements
+- ✅ Team collaboration needs
+- ✅ Centralized result management
+- ✅ Compliance and audit requirements
+
 ## 🔍 Monitoring and Debugging
 
 ### Azure Application Insights Integration
@@ -229,14 +365,50 @@ uv add azure-ai-evaluation  # Add evaluation SDK
 - Add delays between requests
 - Use exponential backoff
 
-## 🔄 Workflow
+## 🔄 Evaluation Workflows
+
+### Local Evaluation Workflow
 
 1. **Dataset Loading**: Load evaluation dataset from JSONL file
 2. **Agent Execution**: Run RAG agent on all queries with retry logic
 3. **Response Collection**: Gather agent responses and metadata
-4. **Evaluation**: Apply all metrics to agent responses
+4. **Local Evaluation**: Apply all metrics locally using Azure AI Evaluation SDK
 5. **Analysis**: Calculate summary statistics and rankings
-6. **Reporting**: Generate comprehensive evaluation report
+6. **Reporting**: Generate comprehensive evaluation report and save locally
+
+**Key Features**:
+- Direct evaluation using Azure AI Evaluation SDK
+- Immediate results available locally
+- Full debugging capabilities
+- Perfect for development and testing
+
+### Cloud Evaluation Workflow
+
+1. **Dataset Loading**: Load evaluation dataset from JSONL file
+2. **Agent Execution**: Run RAG agent on all queries with retry logic
+3. **Dataset Preparation**: Format dataset for cloud evaluation
+4. **Dataset Upload**: Upload prepared dataset to Azure AI Foundry
+5. **Evaluator Configuration**: Configure cloud evaluators with proper data mapping
+6. **Cloud Evaluation**: Submit evaluation job to Azure AI Foundry
+7. **Status Monitoring**: Monitor evaluation progress with polling
+8. **Result Retrieval**: Retrieve results from Azure AI Foundry portal
+
+**Key Features**:
+- Scalable cloud compute for large datasets
+- Integrated with Azure AI Foundry platform
+- Automatic result logging and tracking
+- Perfect for production and CI/CD pipelines
+
+### Evaluation Metrics Comparison
+
+Both workflows use the same evaluation metrics but with different execution environments:
+
+| Metric | Local Implementation | Cloud Implementation |
+|--------|---------------------|---------------------|
+| **Groundedness** | `GroundednessEvaluator` (local) | `EvaluatorIds.GROUNDEDNESS` (cloud) |
+| **Relevance** | `RelevanceEvaluator` (local) | `EvaluatorIds.RELEVANCE` (cloud) |
+| **Completeness** | `ResponseCompletenessEvaluator` (local) | `EvaluatorIds.COMPLETENESS` (cloud) |
+| **Intent Resolution** | `IntentResolutionEvaluator` (local) | `EvaluatorIds.INTENT_RESOLUTION` (cloud) |
 
 ## 📊 Performance Benchmarks
 

@@ -41,7 +41,7 @@ from azure.ai.projects.models import (
     EvaluatorConfiguration,
     EvaluatorIds,
     Evaluation,
-    InputDataset
+    InputDataset,
 )
 from dotenv import load_dotenv
 
@@ -155,6 +155,7 @@ def main():
             credential=DefaultAzureCredential(),
         )
         
+        
         # Define paths
         base_path = Path(__file__).parent.parent
         dataset_path = base_path / "data" / "single-turn-eval-ds.jsonl"
@@ -195,8 +196,8 @@ def main():
                     "context": "${data.context}",
                 },
             ),
-            "completeness": EvaluatorConfiguration(
-                id=EvaluatorIds.COMPLETENESS.value,
+            "coherence": EvaluatorConfiguration(
+                id=EvaluatorIds.COHERENCE.value,
                 init_params={"deployment_name": model_deployment_name},
                 data_mapping={
                     "query": "${data.query}",
@@ -204,15 +205,7 @@ def main():
                     "ground_truth": "${data.ground_truth}",
                 },
             ),
-            "intent_resolution": EvaluatorConfiguration(
-                id=EvaluatorIds.INTENT_RESOLUTION.value,
-                init_params={"deployment_name": model_deployment_name},
-                data_mapping={
-                    "query": "${data.query}",
-                    "response": "${data.response}",
-                    "context": "${data.context}",
-                },
-            ),
+
         }
         
         logger.info("✅ Configured %d evaluators", len(evaluators))
@@ -245,7 +238,7 @@ def main():
         print("\n" + "="*80)
         print("🏆 RAG AGENT CLOUD EVALUATION SUBMITTED")
         print("="*80)
-        print(f"\n📊 Evaluation Information:")
+        print("\n📊 Evaluation Information:")
         print(f"   • Evaluation Name: {evaluation_response.name}")
         print(f"   • Status: {evaluation_response.status}")
         print(f"   • Dataset ID: {data_id}")
@@ -254,11 +247,11 @@ def main():
         print(f"   • Evaluators: {', '.join(evaluators.keys())}")
         print(f"   • Timestamp: {datetime.now().isoformat()}")
         
-        print(f"\n📈 Next Steps:")
-        print(f"   • Monitor evaluation progress in Azure AI Foundry portal")
+        print("\n📈 Next Steps:")
+        print("   • Monitor evaluation progress in Azure AI Foundry portal")
         print(f"   • Check evaluation results at: {endpoint.replace('/api/projects/', '/ui/projects/')}")
-        print(f"   • Review detailed metrics and insights when completed")
-        print(f"   • Use results for model improvement and optimization")
+        print("   • Review detailed metrics and insights when completed")
+        print("   • Use results for model improvement and optimization")
         
         print("\n" + "="*80)
         

@@ -45,9 +45,17 @@ load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# Suppress noisy HTTP logs from Azure SDKs and OpenAI
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
+logging.getLogger("azure").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 # Get tracer for OpenTelemetry spans
@@ -80,7 +88,7 @@ class RAGAgentService:
         self,
         project_endpoint: Optional[str] = None,
         search_index_name: Optional[str] = None,
-        chat_model: str = "gpt-4.1",
+        chat_model: str = "gpt-4o",
     ):
         """
         Initialize the RAG Agent using Azure AI Agent Service.
@@ -389,6 +397,7 @@ Instructions for answering questions:
         """Clean up resources."""
         try:
             if self.agent:
+                #comment this line to avoid deleting the agent. 
                 self.project_client.agents.delete_agent(self.agent.id)
                 logger.info("RAG Agent cleaned up successfully")
         except Exception as e:

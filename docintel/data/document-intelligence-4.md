@@ -14813,7 +14813,7 @@ Sample code
 Python
 # Analyze pages.
 for page in result.pages:
-print(f" ---- Analyzing layout from page #{page. page_number} ---- ")
+print(f" ---- Analyzing layout from page # {page. page_number} ---- ")
 print(f"Page has width: {page.width} and height: {page.height}, measured with
 unit: {page.unit}")
 View samples on GitHub.
@@ -17718,7 +17718,7 @@ Label and Test Models
 Custom template
 v3.1 API
 Document Intelligence SDK
-Document Intelligence Studio [
+Document Intelligence Studio
 With the v3.0 and later APIs, the build operation to train model supports a new
 buildMode property, to train a custom template model, set the buildMode to template.
 REST
@@ -17737,7 +17737,7 @@ version=2024-11-30
 
 | Model | REST API | SDK | Label and Test Models |
 | --- | --- | --- | --- |
-| Custom template | v3.1 API | Document Intelligence SDK | Document Intelligence Studio [ |
+| Custom template | v3.1 API | Document Intelligence SDK | Document Intelligence Studio |
 
 
 <!---- Page 259 ---------------------------------------------------------------------------------------------------------------------------------->
@@ -34080,7 +34080,7 @@ always safe, even across threads.
 
 <!---- Page 613 ---------------------------------------------------------------------------------------------------------------------------------->
 Additional concepts
-Client options | Accessing the response < | Long-running operations | Handling
+Client options | Accessing the response | Long-running operations | Handling
 failures | Diagnostics | Mocking | Client lifetime
 Examples
 The following section provides several code snippets illustrating common patterns used
@@ -34103,13 +34103,13 @@ var content = new AnalyzeDocumentContent()
 UrlSource = uriSource
 };
 Operation<AnalyzeResult> operation = await
-client. AnalyzeDocumentAsync(WaitUntil. Completed, "prebuilt-layout",
+client. AnalyzeDocumentAsync (WaitUntil. Completed, "prebuilt-layout",
 content);
 AnalyzeResult result = operation. Value;
 foreach (DocumentPage page in result. Pages)
 {
 Console.WriteLine($"Document Page {page. PageNumber} has
-{page. Lines.Count} line(s), {page.Words. Count} word(s)," +
+{page. Lines. Count} line(s), {page.Words. Count} word(s)," +
 $" and {page. SelectionMarks. Count} selection mark(s).");
 for (int i = 0; i < page. Lines.Count; i++)
 {
@@ -34554,7 +34554,7 @@ they're tailored to your documents.
 addition to text language information.
 · Classifiers - Build custom classifiers to categorize documents into predefined
 classes.
-Source code | Package (Maven) | API reference documentation | Product
+Source code [ | Package (Maven) | API reference documentation | Product
 Documentation | Samples [
 Getting started
 Prerequisites
@@ -35149,7 +35149,7 @@ Create and authenticate a DocumentIntelligenceClient
 To use an Azure Active Directory (AAD) token credential , provide an instance of the desired
 credential type obtained from the @azure/identity library.
 To authenticate with AAD, you must first npm install @azure/identity
-After setup, you can choose which type of credential z from @azure/identity to use. As an
+After setup, you can choose which type of credential from @azure/identity to use. As an
 example, DefaultAzureCredential can be used to authenticate the client.
 Set the values of the client ID, tenant ID, and client secret of the AAD application as
 environment variables: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET

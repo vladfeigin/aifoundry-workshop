@@ -52,12 +52,8 @@ from agents.rag.rag_agent import RAGAgentService, RAGResponse
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(
-    level=logging.WARNING,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 def generate_agent_responses(dataset_path: str, output_path: str) -> str:
     """

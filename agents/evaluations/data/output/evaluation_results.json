@@ -1,39 +1,39 @@
 {
-  "dataset_size": 10,
+  "dataset_size": 9,
   "evaluation_metrics": {
     "groundedness": {
-      "mean": 3.4,
-      "min": 1.0,
+      "mean": 4.0,
+      "min": 3.0,
       "max": 5.0,
-      "count": 10
+      "count": 9
     },
     "relevance": {
-      "mean": 4.3,
-      "min": 1.0,
+      "mean": 4.777777777777778,
+      "min": 4.0,
       "max": 5.0,
-      "count": 10
+      "count": 9
     },
     "completeness": {
       "mean": 0.0,
       "min": 0.0,
       "max": 0.0,
-      "count": 10
+      "count": 9
     },
     "intent_resolution": {
-      "mean": 4.4,
-      "min": 2.0,
+      "mean": 5.0,
+      "min": 5.0,
       "max": 5.0,
-      "count": 10
+      "count": 9
     }
   },
   "individual_scores": [
     {
       "query": "What is GPT-4?",
-      "groundedness": 1.0,
-      "relevance": 1.0,
+      "groundedness": 4.0,
+      "relevance": 5.0,
       "completeness": 0.0,
-      "intent_resolution": 2.0,
-      "response_time": 9.595020055770874
+      "intent_resolution": 5.0,
+      "response_time": 9.117968797683716
     },
     {
       "query": "How did GPT-4 perform on the bar exam?",
@@ -41,15 +41,15 @@
       "relevance": 5.0,
       "completeness": 0.0,
       "intent_resolution": 5.0,
-      "response_time": 7.196977853775024
+      "response_time": 8.219789981842041
     },
     {
       "query": "What are the main limitations of GPT-4?",
-      "groundedness": 3.0,
-      "relevance": 5.0,
+      "groundedness": 4.0,
+      "relevance": 4.0,
       "completeness": 0.0,
       "intent_resolution": 5.0,
-      "response_time": 8.336831331253052
+      "response_time": 9.503112077713013
     },
     {
       "query": "What is Azure AI Document Intelligence?",
@@ -57,23 +57,23 @@
       "relevance": 5.0,
       "completeness": 0.0,
       "intent_resolution": 5.0,
-      "response_time": 8.103527069091797
+      "response_time": 8.726150274276733
     },
     {
       "query": "What types of prebuilt models does Azure Document Intelligence offer?",
-      "groundedness": 3.0,
-      "relevance": 5.0,
+      "groundedness": 4.0,
+      "relevance": 4.0,
       "completeness": 0.0,
       "intent_resolution": 5.0,
-      "response_time": 8.047254085540771
+      "response_time": 8.740520238876343
     },
     {
       "query": "How does GPT-4's performance scale with compute?",
-      "groundedness": 3.0,
-      "relevance": 3.0,
+      "groundedness": 5.0,
+      "relevance": 5.0,
       "completeness": 0.0,
-      "intent_resolution": 2.0,
-      "response_time": 6.741445064544678
+      "intent_resolution": 5.0,
+      "response_time": 9.199928998947144
     },
     {
       "query": "What custom models can be built with Azure Document Intelligence?",
@@ -81,7 +81,7 @@
       "relevance": 5.0,
       "completeness": 0.0,
       "intent_resolution": 5.0,
-      "response_time": 9.564106941223145
+      "response_time": 9.336455345153809
     },
     {
       "query": "What benchmarks was GPT-4 evaluated on?",
@@ -89,57 +89,49 @@
       "relevance": 5.0,
       "completeness": 0.0,
       "intent_resolution": 5.0,
-      "response_time": 7.322386980056763
+      "response_time": 11.255007982254028
     },
     {
       "query": "What add-on capabilities does Azure Document Intelligence provide?",
       "groundedness": 3.0,
-      "relevance": 4.0,
-      "completeness": 0.0,
-      "intent_resolution": 5.0,
-      "response_time": 8.505175113677979
-    },
-    {
-      "query": "What safety measures were implemented for GPT-4?",
-      "groundedness": 5.0,
       "relevance": 5.0,
       "completeness": 0.0,
       "intent_resolution": 5.0,
-      "response_time": 9.911508083343506
+      "response_time": 9.138773202896118
     }
   ],
   "summary_statistics": {
     "groundedness": {
-      "mean": 3.4,
-      "min": 1.0,
+      "mean": 4.0,
+      "min": 3.0,
       "max": 5.0,
-      "count": 10
+      "count": 9
     },
     "relevance": {
-      "mean": 4.3,
-      "min": 1.0,
+      "mean": 4.777777777777778,
+      "min": 4.0,
       "max": 5.0,
-      "count": 10
+      "count": 9
     },
     "completeness": {
       "mean": 0.0,
       "min": 0.0,
       "max": 0.0,
-      "count": 10
+      "count": 9
     },
     "intent_resolution": {
-      "mean": 4.4,
-      "min": 2.0,
+      "mean": 5.0,
+      "min": 5.0,
       "max": 5.0,
-      "count": 10
+      "count": 9
     },
     "overall": {
-      "mean": 3.025,
-      "min": 1.0,
+      "mean": 3.4444444444444446,
+      "min": 3.25,
       "max": 3.75,
-      "count": 10
+      "count": 9
     }
   },
-  "evaluation_time": 109.92721009254456,
-  "timestamp": "2025-07-18T19:10:16.277494"
+  "evaluation_time": 121.86730313301086,
+  "timestamp": "2025-07-19T18:47:40.596576"
 }

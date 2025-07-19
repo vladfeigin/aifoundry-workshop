@@ -54,12 +54,16 @@ from agents.rag.rag_agent import RAGAgentService, RAGResponse
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
+# Suppress noisy HTTP logs from Azure SDKs and OpenAI
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
+logging.getLogger("azure").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class EvaluationDataPoint:
@@ -68,7 +72,6 @@ class EvaluationDataPoint:
     context: str
     ground_truth: str
     agent_response: Optional[str] = None
-    sources: Optional[List[Dict[str, Any]]] = None
     response_time: Optional[float] = None
 
 
@@ -238,11 +241,6 @@ class RAGAgentEvaluator:
                         context=datapoint.context,
                         ground_truth=datapoint.ground_truth,
                         agent_response=rag_response.answer,
-                        sources=[{
-                            'docid': source['docid'],
-                            'score': source['score'],
-                            'content_preview': source.get('content_preview', '')
-                        } for source in rag_response.sources],
                         response_time=response_time
                     )
                     
@@ -261,7 +259,6 @@ class RAGAgentEvaluator:
                             context=datapoint.context,
                             ground_truth=datapoint.ground_truth,
                             agent_response=f"ERROR: {str(e)}",
-                            sources=[],
                             response_time=0.0
                         )
                         updated_dataset.append(failed_datapoint)

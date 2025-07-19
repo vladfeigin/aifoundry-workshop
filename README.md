@@ -143,7 +143,7 @@ aifoundry-workshop/
    ```bash
    # Copy and edit the environment template
    cp .env.template .env
-   # Edit .env with your Azure credentials and endpoints
+   # Edit .env with your Azure specifc values
    ```
 4. **Convert PDFs to Markdown (Document Intelligence)**
 
@@ -170,7 +170,8 @@ aifoundry-workshop/
 5. **Set up Azure AI Search**
 
    ```bash
-   # Create search index
+   # 1. Create search index
+   # Take the AI Search service name from Azure AI Search portal 
    # Run from the project root folder:
 
    python ./aisearch/create_search_index.py --search-service <service_name> --index-name <index_name>
@@ -179,7 +180,7 @@ aifoundry-workshop/
 
    Check in Azure AI Search portal, an index has been created.
 
-   # Ingest documents documents to the index
+   # 2. Ingest documents documents to the index
    python -m aisearch.ingest_documents --search-service <service_name> --index-name <index_name> 
    ```
 6. **Run the RAG Agent**
@@ -191,8 +192,12 @@ aifoundry-workshop/
 7. **Evaluate the RAG Agent**
 
    ```bash
-   # Run comprehensive evaluation
+   # Run local evaluation
    python -m agents.evaluations.rag.rag_agent_eval
+
+   # Run evaluation in Azure
+   python -m agents.evaluations.rag.rag_agent_eval_azure
+
    ```
 
 ## Environment Configuration
@@ -215,12 +220,6 @@ AZURE_OPENAI_CHAT_MODEL=gpt-4o
 # Azure Document Intelligence
 AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://your-doc-intel-service.cognitiveservices.azure.com/
 AZURE_DOCUMENT_INTELLIGENCE_API_KEY=your-doc-intel-api-key
-
-# Azure AI Foundry (for evaluation and tracing)
-AZURE_SUBSCRIPTION_ID=your-subscription-id
-AZURE_RESOURCE_GROUP=your-resource-group
-AZURE_PROJECT_NAME=your-ai-foundry-project
-AZURE_PROJECT_ENDPOINT=https://your-project.your-region.api.azureml.ms
 
 # Azure Monitor (for tracing)
 APPLICATIONINSIGHTS_CONNECTION_STRING=your-app-insights-connection-string

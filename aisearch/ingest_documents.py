@@ -37,6 +37,9 @@ import time
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Suppress HTTP request logging from Azure libraries
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
+
 
 class DocumentProcessor:
     """
@@ -116,9 +119,9 @@ class DocumentProcessor:
             return []
         
         # Truncate text if too long (Azure OpenAI has token limits)
-        if len(text) > 8000:  # Conservative limit for text-embedding models
-            text = text[:8000]
-            logger.warning("Text truncated to 8000 characters for embedding generation")
+        #if len(text) > 8000:  # Conservative limit for text-embedding models
+        #    text = text[:8000]
+        #    logger.warning("Text truncated to 8000 characters for embedding generation")
         
         for attempt in range(max_retries):
             try:
@@ -185,7 +188,7 @@ class DocumentProcessor:
                     
                     # Generate embedding using Azure AI Foundry
                     try:
-                        logger.debug(f"Generating embedding for {doc_id}")
+                        logger.info(f"Generating embedding for {doc_id}")
                         embedding = self.generate_embedding(page_content)
                         
                         if not embedding:  # Skip if embedding generation failed
@@ -204,7 +207,7 @@ class DocumentProcessor:
                     }
                     
                     documents.append(document)
-                    logger.debug(f"Prepared document: {doc_id} ({len(embedding)} dimensions)")
+                    logger.info(f"Prepared document: {doc_id} ({len(embedding)} dimensions)")
                 
             except Exception as e:
                 logger.error(f"Error processing file {md_file}: {str(e)}")
@@ -312,6 +315,16 @@ class DocumentProcessor:
         try:
             logger.info(f"Uploading {len(documents)} documents to index {self.index_name}")
             
+            if not documents:
+                logger.error("No documents to upload!")
+                return False
+            
+            # Log first document structure to debug
+            logger.info(f"Sample document keys: {list(documents[0].keys())}")
+            
+            success_count = 0
+            error_count = 0
+            
             # Upload in batches for better performance
             for i in range(0, len(documents), batch_size):
                 batch = documents[i:i + batch_size]
@@ -320,12 +333,15 @@ class DocumentProcessor:
                 # Check for errors
                 for doc_result in result:
                     if not doc_result.succeeded:
+                        error_count += 1
                         logger.error(f"Failed to upload document {doc_result.key}: {doc_result.error_message}")
+                    else:
+                        success_count += 1
                 
                 logger.info(f"Uploaded batch {i//batch_size + 1}/{(len(documents) + batch_size - 1)//batch_size}")
             
-            logger.info("Document upload completed successfully")
-            return True
+            logger.info(f"Upload completed: {success_count} successful, {error_count} failed")
+            return success_count > 0
             
         except Exception as e:
             logger.error(f"Error uploading documents: {str(e)}")

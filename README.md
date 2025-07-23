@@ -113,13 +113,14 @@ aifoundry-workshop/
 
 ### Prerequisites
 
-- Python 3.12+
 - Azure subscription with access to:
   - Azure AI Foundry
   - Azure AI Search
   - Azure Document Intelligence
+- Python 3.12+
 - UV package manager (recommended) or pip
 - Participants should have "Azure AI User" role
+- Azure CLI
 
 ### Quick Setup
 
@@ -129,15 +130,28 @@ aifoundry-workshop/
    git clone https://github.com/vladfeigin/aifoundry-workshop.git
    cd aifoundry-workshop
    ```
-2. **Install dependencies**
+2. **Prepare environment**
 
-   ```bash
-   # Using UV (recommended)
-   uv sync
+   - [Development Containers](https://containers.dev/) Option (recommended):
 
-   # Or using pip
-   pip install -e .
-   ```
+      Install [Docker](https://www.docker.com/products/docker-desktop/)
+      
+      Install [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) for VS Code and allow to run the project in a container.
+
+   - Local environment option: 
+   
+      Installing dependencies for Python:
+
+      ```bash
+      # Using UV (recommended)
+      uv sync
+
+      # Or using pip
+      pip install -e .
+      ```
+
+      Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) as well.
+
 3. **Configure environment**
 
    ```bash
@@ -147,7 +161,7 @@ aifoundry-workshop/
    ```
 4. **Convert PDFs to Markdown (Document Intelligence)**
 
-   ```bash
+   ```bash  
    # Convert PDF documents to Markdown format using Azure Document Intelligence
    # This step prepares your PDF documents for indexing in Azure AI Search
 
@@ -170,18 +184,21 @@ aifoundry-workshop/
 5. **Set up Azure AI Search**
 
    ```bash
-   # 1. Create search index
+   # 1. Login to Azure Portal
+   az login
+
+   # 2. Create search index
    # Take the AI Search service name from Azure AI Search portal 
    # Run from the project root folder:
 
-   python ./aisearch/create_search_index.py --search-service <service_name> --index-name <index_name>
+   python ./aisearch/create_search_index.py --search-service <service_name> --index-name <index_name>  --use-api-key
    or
-   python -m aisearch.create_search_index --search-service <service_name> --index-name <index_name>
+   python -m aisearch.create_search_index --search-service <service_name> --index-name <index_name>  --use-api-key
 
    Check in Azure AI Search portal, an index has been created.
 
-   # 2. Ingest documents documents to the index
-   python -m aisearch.ingest_documents --search-service <service_name> --index-name <index_name> 
+   # 3. Ingest documents documents to the index
+   python -m aisearch.ingest_documents --search-service <service_name> --index-name <index_name>
    ```
 6. **Run the RAG Agent**
 

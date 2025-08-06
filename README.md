@@ -122,6 +122,10 @@ aifoundry-workshop/
 - Participants should have "Azure AI User" role
 - Azure CLI
 
+> 📖 **For detailed setup instructions**: See [TUTORIALS.md](TUTORIALS.md#tutorial-1-setting-up-your-first-rag-pipeline)  
+> 🔧 **For development setup**: See [CONTRIBUTING.md](CONTRIBUTING.md#development-environment-setup)  
+> 🚀 **For production deployment**: See [DEPLOYMENT.md](DEPLOYMENT.md)
+
 ### Quick Setup
 
 1. **Clone the repository**
@@ -371,6 +375,10 @@ This workshop is designed for learning purposes. Feel free to:
 - Enhance observability and tracing
 - Improve error handling and logging
 
+> 📖 **For detailed contribution guidelines**: See [CONTRIBUTING.md](CONTRIBUTING.md)  
+> 🏗️ **For architecture information**: See [ARCHITECTURE.md](ARCHITECTURE.md)  
+> 🔍 **For troubleshooting**: See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
 ## Resources
 
 - [Azure AI Foundry Documentation](https://docs.microsoft.com/azure/ai-foundry/)
@@ -379,6 +387,23 @@ This workshop is designed for learning purposes. Feel free to:
 - [Azure Document Intelligence Documentation](https://docs.microsoft.com/azure/cognitive-services/document-intelligence/)
 - [Azure AI Evaluation SDK](https://docs.microsoft.com/azure/ai-foundry/how-to/evaluate-generative-ai-app)
 - [Azure Monitor OpenTelemetry](https://docs.microsoft.com/azure/azure-monitor/app/opentelemetry-enable)
+
+## Documentation
+
+This project includes comprehensive documentation:
+
+- **[TUTORIALS.md](TUTORIALS.md)** - Step-by-step tutorials and walkthroughs
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Developer contribution guidelines  
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed system architecture and design patterns
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment and DevOps guide
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
+- **[docs/README.md](docs/README.md)** - Documentation index and navigation guide
+
+### Module-Specific Documentation
+- **[agents/rag/README.md](agents/rag/README.md)** - RAG Agent implementation
+- **[agents/evaluations/rag/README.md](agents/evaluations/rag/README.md)** - Evaluation framework
+- **[aisearch/README.md](aisearch/README.md)** - Azure AI Search integration
+- **[docintel/README.md](docintel/README.md)** - Document Intelligence utilities
 
 ## Architecture Overview
 
